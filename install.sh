@@ -12,7 +12,7 @@ DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
 WORK="$DEST/system/.dcg_install_tmp"
 BACKUP="$DEST/system/dcg_backup_$(date +%Y%m%d_%H%M%S)"
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 
 # --- Affichage -------------------------------------------------------------
 if [ -t 1 ]; then
@@ -112,7 +112,73 @@ ok "Droits d'exécution appliqués"
 mkdir -p "$DEST/roms/teknoparrot" "$DEST/system/configs/linuxloader"
 ok "Dossiers créés (roms/teknoparrot, configs/linuxloader)"
 
-# --- 6. Vérification -------------------------------------------------------
+# --- 6. Préconfiguration des jeux (batocera.conf) --------------------------
+step "Préconfiguration des jeux (batocera.conf)"
+BATOCERA_CONF="$DEST/system/batocera.conf"
+[ -f "$BATOCERA_CONF" ] || touch "$BATOCERA_CONF"
+
+# Ajoute "clé=valeur" à la fin du fichier, uniquement si la clé n'existe pas
+# déjà (une valeur déjà définie par l'utilisateur n'est jamais modifiée).
+conf_add() {
+    local line="$1" key="${1%%=*}"
+    if awk -v k="$key=" 'index($0, k) == 1 { found = 1 } END { exit !found }' "$BATOCERA_CONF"; then
+        return 1
+    fi
+    # S'assure que le fichier se termine par un saut de ligne
+    if [ -s "$BATOCERA_CONF" ] && [ -n "$(tail -c 1 "$BATOCERA_CONF")" ]; then
+        echo >> "$BATOCERA_CONF"
+    fi
+    if [ "$CONF_HEADER_DONE" != 1 ]; then
+        printf '\n# Préconfiguration linuxloader (install DCG)\n' >> "$BATOCERA_CONF"
+        CONF_HEADER_DONE=1
+    fi
+    printf '%s\n' "$line" >> "$BATOCERA_CONF"
+}
+
+CONF_HEADER_DONE=0
+CONF_ADDED=0
+CONF_SKIPPED=0
+while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    if conf_add "$line"; then
+        CONF_ADDED=$((CONF_ADDED + 1))
+    else
+        CONF_SKIPPED=$((CONF_SKIPPED + 1))
+    fi
+done <<'CONF_EOF'
+teknoparrot["Jurassic Park.squashfs"].emulator=linuxloader
+teknoparrot["Jurassic Park.squashfs"].core=linuxloader
+teknoparrot["Galaga Assault.squashfs"].emulator=linuxloader
+teknoparrot["Galaga Assault.squashfs"].core=linuxloader
+teknoparrot["Cruis'n Blast.squashfs"].emulator=linuxloader
+teknoparrot["Cruis'n Blast.squashfs"].core=linuxloader
+teknoparrot["Pac-Man Chomp Mania.squashfs"].core=linuxloader
+teknoparrot["Pac-Man Chomp Mania.squashfs"].emulator=linuxloader
+teknoparrot["Terminator Salvation.squashfs"].core=linuxloader
+teknoparrot["Terminator Salvation.squashfs"].emulator=linuxloader
+teknoparrot["Big Buck World.squashfs"].core=linuxloader
+teknoparrot["Big Buck World.squashfs"].emulator=linuxloader
+teknoparrot["The Walking Dead.squashfs"].core=linuxloader
+teknoparrot["The Walking Dead.squashfs"].emulator=linuxloader
+teknoparrot["Halo Fireteam Raven.squashfs"].core=linuxloader
+teknoparrot["Halo Fireteam Raven.squashfs"].emulator=linuxloader
+teknoparrot["Pink Panther Jewel Heist.squashfs"].core=linuxloader
+teknoparrot["Pink Panther Jewel Heist.squashfs"].emulator=linuxloader
+teknoparrot["Aliens Armageddon.squashfs"].core=linuxloader
+teknoparrot["Aliens Armageddon.squashfs"].emulator=linuxloader
+teknoparrot["Big Buck HD Wild.squashfs"].core=linuxloader
+teknoparrot["Big Buck HD Wild.squashfs"].emulator=linuxloader
+teknoparrot.use_guns=1
+CONF_EOF
+
+if [ "$CONF_ADDED" -gt 0 ]; then
+    ok "$CONF_ADDED ligne(s) ajoutée(s) à batocera.conf"
+else
+    ok "batocera.conf déjà à jour"
+fi
+[ "$CONF_SKIPPED" -gt 0 ] && ok "$CONF_SKIPPED ligne(s) déjà présente(s), conservée(s) telles quelles"
+
+# --- 7. Vérification -------------------------------------------------------
 step "Vérification"
 missing=0
 for f in \
@@ -143,6 +209,21 @@ else
     printf "${B}${G}✔ Installation terminée avec succès !${N}\n"
 fi
 printf "  Placez vos jeux dans : ${B}%s/roms/teknoparrot${N}\n" "$DEST"
+
+# --- Remerciements ---------------------------------------------------------
+printf "\n${B}${C}╔══════════════════════════════════════════════╗${N}\n"
+printf   "${B}${C}║${N}              ${B}${Y}REMERCIEMENTS${N}                   ${B}${C}║${N}\n"
+printf   "${B}${C}╠══════════════════════════════════════════════╣${N}\n"
+printf   "${B}${C}║${N}                                              ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}   Un immense merci à :                       ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}                                              ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}      ${B}${G}@Spirit${N}                                 ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}      ${B}${G}@Psman69${N}                                ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}      ${B}${G}la Team TPN${N}                             ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}                                              ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}   pour leur travail et leur passion !        ${B}${C}║${N}\n"
+printf   "${B}${C}║${N}                                              ${B}${C}║${N}\n"
+printf   "${B}${C}╚══════════════════════════════════════════════╝${N}\n"
 
 # --- Redémarrage optionnel d'EmulationStation ------------------------------
 # (le script est lu via un pipe : on interroge le clavier via /dev/tty)
