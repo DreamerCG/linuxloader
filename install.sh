@@ -171,6 +171,11 @@ teknoparrot["Aliens Armageddon.squashfs"].emulator=linuxloader
 teknoparrot["Big Buck HD Wild.squashfs"].core=linuxloader
 teknoparrot["Big Buck HD Wild.squashfs"].emulator=linuxloader
 teknoparrot.use_guns=1
+teknoparrot.emulator=wine
+teknoparrot.wine-runner=wine-proton
+teknoparrot.bezel=none
+teknoparrot.dxvk=1
+teknoparrot.esync=1
 CONF_EOF
 
 if [ "$CONF_ADDED" -gt 0 ]; then
