@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import re
 import sys
-import subprocess
 import os
 import yaml
 
@@ -37,55 +36,71 @@ def _detect_batocera_version() -> int | None:
     return int(m.group(1))
 
 def _new_get_generator(emulator: str, core: str | None = None):
-
-    print(f"Selected emulator: {emulator}", file=sys.stderr)
-    print(f"Selected Rom : {rom}", file=sys.stderr)
-
-    try:
-
-        if emulator == 'play':
-            from generators.namco2x6.playGenerator import PlayGenerator
-            return PlayGenerator()
-
-        if emulator == 'rpcs3':
-            from generators.rcps3.rpcs3Generator import Rpcs3Generator
-            return Rpcs3Generator()
-
-        if emulator == 'wine':
-            from generators.wine.wineGeneratorS import WineGenerator
-            return WineGenerator()
-
-        if emulator == 'demul':
-            from generators.demul.demulGenerator import DemulGenerator
-            return DemulGenerator()
-
-        if emulator == 'shadps4':
-            from generators.shadps4.shadPS4Generator import shadPS4Generator
-            return shadPS4Generator()
-
-        if emulator == 'linuxloader':
-            from generators.linuxloader.linuxloaderGenerator import LinuxloaderGenerator
-            return LinuxloaderGenerator()
-
-    except (ImportError, ModuleNotFoundError, AttributeError) as e:
-
-        print(
-            f"WARNING: Custom generator unavailable for '{emulator}': {e}",
-            file=sys.stderr
-        )
-
-        print(
-            f"Falling back to Batocera generator for '{emulator}'",
-            file=sys.stderr
-        )
-
-    # fallback to Batocera generator
-    return get_generator(emulator, core)
     
+    print(f"Selected emulator: {emulator}", file=sys.stderr)    
+    print(f"Selected Rom : {rom}", file=sys.stderr)    
+    print(f"Selected Core : {core}", file=sys.stderr)    
+
+    if emulator == 'play':
+        from generators.namco2x6.playGenerator import PlayGenerator
+        return PlayGenerator()
+		
+    if emulator == 'rpcs3':
+        from generators.rcps3.rpcs3Generator import Rpcs3Generator
+        return Rpcs3Generator()		
+
+    if emulator == 'wine':
+        from generators.wine.wineGenerator import WineGenerator
+        return WineGenerator()    
+
+    if emulator == 'demul':
+        from generators.demul.demulGenerator import DemulGenerator
+        return DemulGenerator()
+
+    if emulator == 'shadps4':
+        from generators.shadps4.shadPS4Generator import shadPS4Generator
+        return shadPS4Generator()
+
+    if emulator == 'linuxloader':
+        from generators.linuxloader.linuxloaderGenerator import LinuxloaderGenerator
+        return LinuxloaderGenerator()
+
+    # ==========================================
+    # FALLBACK TO BATOCERA
+    # ==========================================
+
+    if "-system" in sys.argv:
+        sys.argv[sys.argv.index("-system") + 1] = "windows"
+        print(
+            "Fallback to Batocera generator: forcing system=windows",
+            file=sys.stderr
+        )
+        system_name = sys.argv[sys.argv.index("-system") + 1]
+        print("Debug System :", system_name, file= sys.stderr)
+
+    return get_generator(emulator)
+
 from configgen.batoceraPaths import DEFAULTS_DIR
 configgen.emulatorlauncher.get_generator = _new_get_generator
 
 if __name__ == "__main__":
+
+    if emulator_name not in (
+        'play',
+        'rpcs3',
+        'demul',
+        'shadps4',
+        'linuxloader',
+    ):
+        if "-system" in sys.argv:
+            system_index = sys.argv.index("-system")
+            sys.argv[system_index + 1] = "windows"
+
+            print(
+                "No custom generator - forcing system=windows",
+                file=sys.stderr
+            )
+
     sys.argv[0] = re.sub(r"(-script\.pyw|\.exe)?$", "", sys.argv[0])
+
     sys.exit(launch())
-    
