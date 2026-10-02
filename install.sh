@@ -101,6 +101,8 @@ find "$DEST/system/dcg/configgen" -name '*.py' -exec sed -i 's/\r$//' {} + 2>/de
 ok "Fins de ligne corrigées"
 
 chmod +x "$DEST/system/dcg/configgen/dcglauncher" 2>/dev/null || true
+chmod +x "$DEST/system/dcg/bin/batocera-wine" 2>/dev/null || true
+
 LL="$DEST/system/dcg/emulators/linuxloader"
 if [ -d "$LL" ]; then
     chmod +x "$LL/linuxloader" "$LL"/*.so 2>/dev/null || true
