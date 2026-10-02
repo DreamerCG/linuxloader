@@ -468,6 +468,7 @@ class LinuxloaderGenerator(Generator):
         os.chdir(LINUXLOADER_DIR)
         version = _detect_batocera_version()
         print("Batocera Version :", version, file=sys.stderr)
+        print("Debug command :", command, file=sys.stderr)        
 
         # Chemins de base communs à toutes les versions
         ld_library_path = (
