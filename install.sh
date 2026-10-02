@@ -184,6 +184,7 @@ missing=0
 for f in \
     system/dcg/configgen/dcglauncher \
     system/dcg/configgen/generators/linuxloader/linuxloaderGenerator.py \
+    system/dcg/configgen/generators/wine/wineGenerator.py \
     system/dcg/emulators/linuxloader/linuxloader \
     system/configs/emulationstation/es_systems_teknoparrot.cfg \
     system/configs/emulationstation/es_features_linuxloader.cfg; do
