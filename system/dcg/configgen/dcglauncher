@@ -37,43 +37,49 @@ def _detect_batocera_version() -> int | None:
     return int(m.group(1))
 
 def _new_get_generator(emulator: str, core: str | None = None):
-    
-    print(f"Selected emulator: {emulator}", file=sys.stderr)    
-    print(f"Selected Rom : {rom}", file=sys.stderr)    
 
-    if emulator == 'play':
-        from generators.namco2x6.playGenerator import PlayGenerator
-        return PlayGenerator()
-		
-    if emulator == 'rpcs3':
-        from generators.rcps3.rpcs3Generator import Rpcs3Generator
-        return Rpcs3Generator()		
+    print(f"Selected emulator: {emulator}", file=sys.stderr)
+    print(f"Selected Rom : {rom}", file=sys.stderr)
 
-    if emulator == 'wine':
-        from generators.wine.wineGenerator import WineGenerator
-        return WineGenerator()    
+    try:
 
-    if emulator == 'demul':
-        from generators.demul.demulGenerator import DemulGenerator
-        return DemulGenerator()
+        if emulator == 'play':
+            from generators.namco2x6.playGenerator import PlayGenerator
+            return PlayGenerator()
 
-    if emulator == 'xenia-canary-netplay':
-        from generators.xenia.xeniaGenerator import XeniaGenerator
-        return XeniaGenerator()				
-		
-    if emulator == 'xenia-edge':
-        from generators.xenia.xeniaGenerator import XeniaGenerator
-        return XeniaGenerator()		
+        if emulator == 'rpcs3':
+            from generators.rcps3.rpcs3Generator import Rpcs3Generator
+            return Rpcs3Generator()
 
-    if emulator == 'shadps4':
-        from generators.shadps4.shadPS4Generator import shadPS4Generator
-        return shadPS4Generator()
+        if emulator == 'wine':
+            from generators.wine.wineGeneratorS import WineGenerator
+            return WineGenerator()
 
-    if emulator == 'linuxloader':
-        from generators.linuxloader.linuxloaderGenerator import LinuxloaderGenerator
-        return LinuxloaderGenerator()
+        if emulator == 'demul':
+            from generators.demul.demulGenerator import DemulGenerator
+            return DemulGenerator()
 
-    #fallback to batocera generators
+        if emulator == 'shadps4':
+            from generators.shadps4.shadPS4Generator import shadPS4Generator
+            return shadPS4Generator()
+
+        if emulator == 'linuxloader':
+            from generators.linuxloader.linuxloaderGenerator import LinuxloaderGenerator
+            return LinuxloaderGenerator()
+
+    except (ImportError, ModuleNotFoundError, AttributeError) as e:
+
+        print(
+            f"WARNING: Custom generator unavailable for '{emulator}': {e}",
+            file=sys.stderr
+        )
+
+        print(
+            f"Falling back to Batocera generator for '{emulator}'",
+            file=sys.stderr
+        )
+
+    # fallback to Batocera generator
     return get_generator(emulator, core)
     
 from configgen.batoceraPaths import DEFAULTS_DIR
