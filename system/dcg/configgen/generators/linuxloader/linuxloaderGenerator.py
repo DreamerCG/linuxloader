@@ -35,12 +35,25 @@ _logger = logging.getLogger(__name__)
 # Controls are set per game kind, from the rom name: gun games (default),
 # driving (Cruis'n Blast) and joystick (Galaga Assault, Pac-Man Chomp
 # Mania, Pink Panther Jewel Heist). On every pad, Start starts, Select
-# inserts a coin, L3 is the test switch and R3 service.
+# inserts a coin, R3 is the test switch and L3 service.
 #
 # Driving: a wheel or a pad steers the same way (left stick or wheel, R2 gas,
 # L2 brake); the device steering also gets the game's force feedback, a
 # wheel's motor force or, on a pad, a rumble (linuxloader picks it from
 # ANALOGUE_1).
+#
+# The Namco ES1 games run through linuxloader too. Each rom is the cabinet's
+# /opt/arcade/exec (a.elf at its top, with data/ and the save directories),
+# and lib/ for what Batocera does not carry: sdl12-compat (libSDL-1.2.so.0)
+# for Nirin and Dead Heat, a 32-bit libusb-1.0.so.0 for Dead Heat Riders.
+#
+# Nirin (a motorbike game) drives like the driving games (left stick or
+# wheel, R2 gas, L2 brake); its buttons and gears are its own (_PAD_BIKE).
+# Dead Heat and Dead Heat Riders steer with the left stick or the wheel and
+# accelerate with R2; Dead Heat brakes with L2 as a pedal, Dead Heat Riders
+# as its brake switch. Their buttons are their own (_PAD_DEADHEAT,
+# _PAD_DHRIDERS). Maximum Heat 3D (Dead Heat's later build) drives as Dead
+# Heat.
 #
 # Halo: Fireteam Raven is the exception. It is a 64-bit g7 title, so the
 # 32-bit loader cannot host it: it runs under halo_rt.so instead, preloaded
@@ -50,7 +63,6 @@ _logger = logging.getLogger(__name__)
 
 LINUXLOADER_DIR: Final = Path('/userdata/system/dcg/emulators/linuxloader')
 LINUXLOADER_CONFIG: Final = CONFIGS / 'linuxloader'
-
 
 # Batocera gun button -> linuxloader evdev input, first match wins. Trigger
 # fires; on a Sinden, button 1 (rear right) starts and button 2 (front right)
@@ -86,8 +98,8 @@ _HALO_GUN_BUTTONS: Final = {
 _PAD_COMMON: Final = {
     'start': 'BUTTON_START',
     'select': 'COIN',
-    'l3': 'TEST_BUTTON',
-    'r3': 'BUTTON_SERVICE',
+    'r3': 'TEST_BUTTON',
+    'l3': 'BUTTON_SERVICE',
 }
 
 # Driving: y (left face button) brakes, b (bottom) changes the view, a
@@ -102,6 +114,51 @@ _PAD_DRIVING: Final = {
 
 # Wheels also change the view and the music with their paddles.
 _WHEEL_DRIVING: Final = {**_PAD_DRIVING, 'pageup': 'BUTTON_2', 'pagedown': 'BUTTON_3'}
+
+# Tank! Tank! Tank!: the cabinet's wheel on the left stick, its two pedals
+# on R2/L2 (as a driving game's), a (right face button) fires and b (bottom)
+# is the safety button; up/down move in the menus.
+_PAD_TANK: Final = {
+    'a': 'BUTTON_1',
+    'b': 'BUTTON_2',
+    'up': 'BUTTON_UP',
+    'down': 'BUTTON_DOWN',
+}
+
+# Nirin: b (bottom face button) selects (its Enter), a (right) changes the
+# view, y (left) the transmission; L1/R1 (a wheel's paddles too) shift down
+# and up, which are player 2's down and up on the cabinet; up/down move in
+# the menus.
+_PAD_BIKE: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_2',
+    'y': 'BUTTON_3',
+    'up': 'BUTTON_UP',
+    'down': 'BUTTON_DOWN',
+}
+_BIKE_SHIFT: Final = {'pageup': 'PLAYER_2_BUTTON_DOWN', 'pagedown': 'PLAYER_2_BUTTON_UP'}
+
+# Dead Heat: b (bottom face button) is Enter, a (right) the view, y (left)
+# the nitrous; L1/R1 (a wheel's paddles too) shift down and up, player 2's
+# down and up on the cabinet; up/down move in the menus.
+_PAD_DEADHEAT: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_2',
+    'y': 'BUTTON_3',
+    'up': 'BUTTON_UP',
+    'down': 'BUTTON_DOWN',
+}
+
+# Dead Heat Riders: b is Enter, y the nitrous, a the view; L2 (a switch on
+# this cabinet) brakes.
+_PAD_DHRIDERS: Final = {
+    'b': 'BUTTON_1',
+    'l2': 'BUTTON_3',
+    'y': 'BUTTON_4',
+    'a': 'BUTTON_5',
+    'up': 'BUTTON_UP',
+    'down': 'BUTTON_DOWN',
+}
 
 # Joystick: b (bottom face button) starts and fires.
 _PAD_JOYSTICK: Final = {'b': 'BUTTON_1'}
@@ -185,6 +242,19 @@ def _game_kind(rom: Path, /) -> str:
         return 'halo'
     if 'cruis' in name:
         return 'driving'
+    # Wangan Midnight Maximum Tune 3 (Namco N2): wheel, pedals, view button.
+    if 'wangan' in name or 'maximum tune' in name:
+        return 'driving'
+    if 'nirin' in name:
+        return 'bike'
+    flat = re.sub(r'[^a-z]', '', name)
+    if 'deadheatriders' in flat or 'dhriders' in flat:
+        return 'dhriders'
+    # Maximum Heat 3D is Dead Heat's later build: the same cabinet and controls.
+    if 'deadheat' in flat or 'maximumheat' in flat:
+        return 'deadheat'
+    if 'tanktanktank' in flat:
+        return 'tank'
     if 'galaga' in name or 'pac' in name or 'panther' in name:
         return 'joystick'
     return 'gun'
@@ -232,12 +302,32 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         if nplayer == 1 or not action.startswith('TEST'):
             _set(evdev, key, _pad_input(pad, name, digital=True))
 
-    if kind == 'driving':
+    if kind in ('driving', 'bike', 'deadheat', 'dhriders', 'tank'):
         if nplayer != 1:
             return
         _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
         _set(evdev, 'ANALOGUE_2', _pad_input(pad, 'r2', digital=False))
+        if kind == 'dhriders':
+            for name, action in _PAD_DHRIDERS.items():
+                _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            return
         _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'l2', digital=False))
+        if kind == 'deadheat':
+            for name, action in _PAD_DEADHEAT.items():
+                _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            for name, key in _BIKE_SHIFT.items():
+                _set(evdev, key, _pad_input(pad, name, digital=True))
+            return
+        if kind == 'tank':
+            for name, action in _PAD_TANK.items():
+                _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            return
+        if kind == 'bike':
+            for name, action in _PAD_BIKE.items():
+                _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            for name, key in _BIKE_SHIFT.items():
+                _set(evdev, key, _pad_input(pad, name, digital=True))
+            return
         for name, action in (_WHEEL_DRIVING if wheel else _PAD_DRIVING).items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == 'joystick':
@@ -245,7 +335,6 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
         # The d-pad and the left stick together (linuxloader takes a list).
         for direction in _DIRECTIONS:
-            
             sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
             _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
 
@@ -350,6 +439,11 @@ class LinuxloaderGenerator(Generator):
                 wheel = system.config.use_wheels and pad.device_path in wheels
                 _setup_pad(evdev, kind, nplayer, pad, wheel=wheel)
 
+        # No controller, gun or pointer mapped: linuxloader's own input, the
+        # keyboard (evdev mode reads nothing but the [EVDEV] devices).
+        if not evdev:
+            conf['Input']['INPUT_MODE'] = '1'
+
         lines: list[str] = []
         for section, values in conf.items():
             lines.append(f'[{section}]')
@@ -399,8 +493,6 @@ class LinuxloaderGenerator(Generator):
                 'SDL_JOYSTICK_HIDAPI': '0',
             },
         )
-
-        
 
     @staticmethod
     def _halo(game_dir: Path, config_file: Path, /) -> Command.Command:
