@@ -85,11 +85,14 @@ configgen.emulatorlauncher.get_generator = _new_get_generator
 
 if __name__ == "__main__":
 
+    print(f"Custom generator: {emulator_name}", file=sys.stderr)
+
     if emulator_name not in (
         'play',
         'rpcs3',
         'demul',
         'shadps4',
+        'wine',
         'linuxloader',
     ):
         if "-system" in sys.argv:

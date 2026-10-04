@@ -102,6 +102,7 @@ ok "Fins de ligne corrigées"
 
 chmod +x "$DEST/system/dcg/configgen/dcglauncher" 2>/dev/null || true
 chmod +x "$DEST/system/dcg/bin/batocera-wine" 2>/dev/null || true
+chmod +x "$DEST/system/dcg/bin/batocera-wine-guns" 2>/dev/null || true
 
 LL="$DEST/system/dcg/emulators/linuxloader"
 if [ -d "$LL" ]; then

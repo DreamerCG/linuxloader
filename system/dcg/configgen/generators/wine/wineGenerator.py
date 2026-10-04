@@ -70,6 +70,11 @@ DEMULSHOOTER_GAMES = {
     "PVZ":               "pvz",
 }
 
+print(f" ===================================", file=sys.stderr)
+print(f" ===================================", file=sys.stderr)
+print(f" Lancement de Wine Generator :", file=sys.stderr)
+print(f" ===================================", file=sys.stderr)
+print(f" ===================================", file=sys.stderr)
 
 def _detect_demulshooter(rom_path):
 
@@ -216,23 +221,25 @@ class WineGenerator(Generator):
 
         #rgs: only for unity demulshooter for now
         ds_game = _detect_demulshooter(str(rom))
+        print(f" Demul Shooter Detected : {ds_game}", file=sys.stderr)
+
         if not ds_game:
             return
 
         #Write per-player gun config + optional DemulShooter bridge config.
         num_guns = len(guns)
-        eslog.info("Wine: %d light gun(s) detected", num_guns)
+        eslog.error("Wine: %d light gun(s) detected", num_guns)
 
         gun_configs = []
         for i in range(num_guns):
             mapping = _build_player_mapping(i, metadata)
             gun_configs.append({"player": i + 1, "mapping": mapping})
-            eslog.info("Wine gun P%d: %s", i + 1,
+            eslog.error("Wine gun P%d: %s", i + 1,
                        ", ".join("{}->{}".format(k, v) for k, v in mapping.items()))
 
         config = {"guns": gun_configs}
 
-        eslog.info("ds_game" + str(ds_game))
+        eslog.error("ds_game" + str(ds_game))
 
         if ds_game:
             width = gameResolution.get("width", 1920) if gameResolution else 1920
@@ -242,12 +249,12 @@ class WineGenerator(Generator):
                 "width": int(width),
                 "height": int(height),
             }
-            eslog.info("Wine gun: DemulShooter bridge: game=%s %dx%d",
+            eslog.error("Wine gun: DemulShooter bridge: game=%s %dx%d",
                        ds_game, width, height)
 
         try:
             with open(GUN_CONFIG_PATH, 'w') as f:
                 json.dump(config, f, indent=2)
-            eslog.info("Wine gun: config written to %s", GUN_CONFIG_PATH)
+            eslog.error("Wine gun: config written to %s", GUN_CONFIG_PATH)
         except Exception as e:
             eslog.error("Wine gun: failed to write config: %s", e)

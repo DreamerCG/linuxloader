@@ -45,7 +45,7 @@ CMD_PREFIX=""
 
 # Light gun support
 GUN_CONFIG_FILE="/var/run/wine-guns.json"
-GUN_SCRIPT="/usr/bin/batocera-wine-guns"
+GUN_SCRIPT="/userdata/system/dcg/bin/batocera-wine-guns"
 GUN_PIDFILE="/var/run/wine-guns.pid"
 
 start_guns() {
