@@ -1,0 +1,55 @@
+#!/bin/bash
+# dcg_update : au démarrage, compare la version locale à celle du dépôt
+# et relance install.sh si une version plus récente existe.
+
+REPO_RAW="https://raw.githubusercontent.com/DreamerCG/linuxloader/main"
+VERSION_FILE="/userdata/system/dcg/VERSION"
+LOG="/userdata/system/logs/dcg_update.log"
+
+log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+
+version_gt() {   # vrai si $1 > $2
+    [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ]
+}
+
+check_update() {
+    mkdir -p "$(dirname "$LOG")"
+
+    # attend le réseau (~60 s max)
+    remote=""
+    for _ in $(seq 1 30); do
+        remote="$(curl -fs --max-time 5 "$REPO_RAW/VERSION" | tr -d '[:space:]')"
+        [ -n "$remote" ] && break
+        sleep 2
+    done
+    [ -z "$remote" ] && { log "version distante injoignable"; return; }
+
+    local_v="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null)"
+    local_v="${local_v:-0}"
+    log "locale=$local_v distante=$remote"
+
+    if version_gt "$remote" "$local_v"; then
+        log "mise à jour vers $remote"
+        if curl -fsL --retry 3 "$REPO_RAW/install.sh" -o /tmp/dcg_install.sh; then
+            if DCG_NONINTERACTIVE=1 bash /tmp/dcg_install.sh >> "$LOG" 2>&1; then
+                log "mise à jour terminée"
+            else
+                log "ÉCHEC de l'installation"
+            fi
+        else
+            log "téléchargement de install.sh impossible"
+        fi
+        rm -f /tmp/dcg_install.sh
+    fi
+}
+
+main() {
+    case "$1" in
+        start)  check_update >/dev/null 2>&1 & ;;   # en arrière-plan : ne bloque pas le boot
+        stop)   ;;
+        status) cat "$VERSION_FILE" 2>/dev/null || echo "inconnue" ;;
+    esac
+}
+
+main "$@"
+exit 0

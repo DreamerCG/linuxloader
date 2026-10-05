@@ -112,6 +112,16 @@ if [ -d "$LL" ]; then
 fi
 ok "Droits d'exécution appliqués"
 
+SVC="$DEST/system/services/dcg_update"
+if [ -f "$SVC" ]; then
+    sed -i 's/\r$//' "$SVC"
+    chmod +x "$SVC"
+    if command -v batocera-services >/dev/null 2>&1; then
+        batocera-services enable dcg_update >/dev/null 2>&1 || warn "activation du service impossible"
+    fi
+    ok "Service dcg_update installé"
+fi
+
 mkdir -p "$DEST/roms/teknoparrot" "$DEST/system/configs/linuxloader"
 ok "Dossiers créés (roms/teknoparrot, configs/linuxloader)"
 
@@ -141,43 +151,21 @@ conf_add() {
 CONF_HEADER_DONE=0
 CONF_ADDED=0
 CONF_SKIPPED=0
-while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    if conf_add "$line"; then
-        CONF_ADDED=$((CONF_ADDED + 1))
-    else
-        CONF_SKIPPED=$((CONF_SKIPPED + 1))
-    fi
-done <<'CONF_EOF'
-teknoparrot["Jurassic Park.squashfs"].emulator=linuxloader
-teknoparrot["Jurassic Park.squashfs"].core=linuxloader
-teknoparrot["Galaga Assault.squashfs"].emulator=linuxloader
-teknoparrot["Galaga Assault.squashfs"].core=linuxloader
-teknoparrot["Cruis'n Blast.squashfs"].emulator=linuxloader
-teknoparrot["Cruis'n Blast.squashfs"].core=linuxloader
-teknoparrot["Pac-Man Chomp Mania.squashfs"].core=linuxloader
-teknoparrot["Pac-Man Chomp Mania.squashfs"].emulator=linuxloader
-teknoparrot["Terminator Salvation.squashfs"].core=linuxloader
-teknoparrot["Terminator Salvation.squashfs"].emulator=linuxloader
-teknoparrot["Big Buck World.squashfs"].core=linuxloader
-teknoparrot["Big Buck World.squashfs"].emulator=linuxloader
-teknoparrot["The Walking Dead.squashfs"].core=linuxloader
-teknoparrot["The Walking Dead.squashfs"].emulator=linuxloader
-teknoparrot["Halo Fireteam Raven.squashfs"].core=linuxloader
-teknoparrot["Halo Fireteam Raven.squashfs"].emulator=linuxloader
-teknoparrot["Pink Panther Jewel Heist.squashfs"].core=linuxloader
-teknoparrot["Pink Panther Jewel Heist.squashfs"].emulator=linuxloader
-teknoparrot["Aliens Armageddon.squashfs"].core=linuxloader
-teknoparrot["Aliens Armageddon.squashfs"].emulator=linuxloader
-teknoparrot["Big Buck HD Wild.squashfs"].core=linuxloader
-teknoparrot["Big Buck HD Wild.squashfs"].emulator=linuxloader
-teknoparrot.use_guns=1
-teknoparrot.emulator=wine
-teknoparrot.wine-runner=wine-proton
-teknoparrot.bezel=none
-teknoparrot.dxvk=1
-teknoparrot.esync=1
-CONF_EOF
+
+TEMP_CONF="$SRC/temp.conf"
+if [ -f "$TEMP_CONF" ]; then
+    sed -i 's/\r$//' "$TEMP_CONF"
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in ''|\#*) continue ;; esac
+        if conf_add "$line"; then
+            CONF_ADDED=$((CONF_ADDED + 1))
+        else
+            CONF_SKIPPED=$((CONF_SKIPPED + 1))
+        fi
+    done < "$TEMP_CONF"
+else
+    warn "temp.conf introuvable dans l'archive : batocera.conf non modifié"
+fi
 
 if [ "$CONF_ADDED" -gt 0 ]; then
     ok "$CONF_ADDED ligne(s) ajoutée(s) à batocera.conf"
@@ -211,6 +199,10 @@ if [ -d "$BACKUP" ]; then
     ok "Sauvegarde temporaire supprimée"
 fi
 
+if [ "$missing" != 1 ]; then
+    cp -f "$SRC/VERSION" "$DEST/system/dcg/VERSION" 2>/dev/null || true
+fi
+
 printf "\n"
 if [ "$missing" = 1 ]; then
     warn "Installation terminée, mais des fichiers sont manquants dans l'archive."
@@ -236,7 +228,7 @@ printf   "${B}${C}╚═══════════════════�
 
 # --- Redémarrage optionnel d'EmulationStation ------------------------------
 # (le script est lu via un pipe : on interroge le clavier via /dev/tty)
-if [ -r /dev/tty ] && command -v batocera-es-swissknife >/dev/null 2>&1; then
+if [ -z "$DCG_NONINTERACTIVE" ] && [ -r /dev/tty ] && command -v batocera-es-swissknife >/dev/null 2>&1; then
     printf "\n${B}Redémarrer EmulationStation maintenant ? [o/N] ${N}"
     read -r answer < /dev/tty || answer=""
     case "$answer" in
