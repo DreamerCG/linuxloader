@@ -37,11 +37,16 @@ _logger = logging.getLogger(__name__)
 # Mania, Pink Panther Jewel Heist). On every pad, Start starts, Select
 # inserts a coin, R3 is the test switch and L3 service.
 #
+# Angry Birds Arcade is a gun game here: its cabinet fires balls with a
+# slingshot at a touch frame, which linuxloader answers with P1's gun (or a
+# mouse), each pull of the trigger a hit where it aims.#
 # Driving: a wheel or a pad steers the same way (left stick or wheel, R2 gas,
 # L2 brake); the device steering also gets the game's force feedback, a
 # wheel's motor force or, on a pad, a rumble (linuxloader picks it from
 # ANALOGUE_1).
 #
+# MotoGP rides the same way (left stick or wheel leans, R2 throttle, L2
+# brake); up/down are its volume buttons, the menus' up and down.#
 # The Namco ES1 games run through linuxloader too. Each rom is the cabinet's
 # /opt/arcade/exec (a.elf at its top, with data/ and the save directories),
 # and lib/ for what Batocera does not carry: sdl12-compat (libSDL-1.2.so.0)
@@ -55,11 +60,12 @@ _logger = logging.getLogger(__name__)
 # _PAD_DHRIDERS). Maximum Heat 3D (Dead Heat's later build) drives as Dead
 # Heat.
 #
-# Halo: Fireteam Raven is the exception. It is a 64-bit g7 title, so the
-# 32-bit loader cannot host it: it runs under halo_rt.so instead, preloaded
-# into the game by the dynamic linker. halo_rt.so reads the same
-# linuxloader.ini (named by LINUXLOADER_CONFIG): resolution, gun border and
-# the [EVDEV] map below.
+# Halo: Fireteam Raven and Centipede Chaos are the exception. They are 64-bit
+# g7 titles, so the 32-bit loader cannot host them: they run under g7_rt.so
+# instead, preloaded into the game by the dynamic linker. g7_rt.so reads the
+# same linuxloader.ini (named by LINUXLOADER_CONFIG): resolution, gun border
+# and, for Halo, the [EVDEV] map below. Centipede reads the keyboard and the
+# gamepads itself (the first three pads are players 1 to 3).
 
 LINUXLOADER_DIR: Final = Path('/userdata/system/dcg/emulators/linuxloader')
 LINUXLOADER_CONFIG: Final = CONFIGS / 'linuxloader'
@@ -115,6 +121,13 @@ _PAD_DRIVING: Final = {
 # Wheels also change the view and the music with their paddles.
 _WHEEL_DRIVING: Final = {**_PAD_DRIVING, 'pageup': 'BUTTON_2', 'pagedown': 'BUTTON_3'}
 
+# MotoGP: up/down are the volume buttons (BUTTON_7/8 in the loader), the
+# menus' up and down.
+_PAD_MOTOGP: Final = {
+    'up': 'BUTTON_7',
+    'down': 'BUTTON_8',
+}
+
 # Tank! Tank! Tank!: the cabinet's wheel on the left stick, its two pedals
 # on R2/L2 (as a driving game's), a (right face button) fires and b (bottom)
 # is the safety button; up/down move in the menus.
@@ -162,6 +175,19 @@ _PAD_DHRIDERS: Final = {
 
 # Joystick: b (bottom face button) starts and fires.
 _PAD_JOYSTICK: Final = {'b': 'BUTTON_1'}
+
+# Wheel of Fortune: the left stick turns the spinner (ANALOGUE_3, as fast
+# as it is pushed), the d-pad's left/right too, slowly, to move through the
+# menus, and its up/down are the volume; b and a are the PUSH button, as Start is. A
+# mouse spins it as well (ANALOGUE_1, its horizontal moves).
+_PAD_WOF: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_1',
+    'left': 'BUTTON_LEFT',
+    'right': 'BUTTON_RIGHT',
+    'up': 'BUTTON_UP',
+    'down': 'BUTTON_DOWN',
+}
 
 _DIRECTIONS: Final = ('up', 'down', 'left', 'right')
 
@@ -240,8 +266,14 @@ def _game_kind(rom: Path, /) -> str:
     name = rom.name.lower()
     if 'halo' in name:
         return 'halo'
+    if 'centipede' in name:
+        return 'centipede'
     if 'cruis' in name:
         return 'driving'
+    # MotoGP (Raw Thrills): a bike steered, accelerated and braked as the
+    # driving games; up/down are its volume buttons.
+    if 'motogp' in re.sub(r'[^a-z]', '', name):
+        return 'motogp'
     # Wangan Midnight Maximum Tune 3 (Namco N2): wheel, pedals, view button.
     if 'wangan' in name or 'maximum tune' in name:
         return 'driving'
@@ -257,6 +289,8 @@ def _game_kind(rom: Path, /) -> str:
         return 'tank'
     if 'galaga' in name or 'pac' in name or 'panther' in name:
         return 'joystick'
+    if 'fortune' in name:
+        return 'wof'
     return 'gun'
 
 
@@ -318,6 +352,10 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             for name, key in _BIKE_SHIFT.items():
                 _set(evdev, key, _pad_input(pad, name, digital=True))
             return
+        if kind == 'motogp':
+            for name, action in _PAD_MOTOGP.items():
+                _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            return
         if kind == 'tank':
             for name, action in _PAD_TANK.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
@@ -329,6 +367,12 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
                 _set(evdev, key, _pad_input(pad, name, digital=True))
             return
         for name, action in (_WHEEL_DRIVING if wheel else _PAD_DRIVING).items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'wof':
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'joystick1left', digital=False))
+        for name, action in _PAD_WOF.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == 'joystick':
         for name, action in _PAD_JOYSTICK.items():
@@ -423,11 +467,18 @@ class LinuxloaderGenerator(Generator):
                         evdev[key] = f'{gun.node}:KEY:{code}'
                 gun_players = nplayer
 
-        if kind in ('gun', 'halo'):
+        if kind in ('gun', 'halo', 'wof'):
             pointers = _pointers(guns if system.config.use_guns and guns else [])
+            # Wheel of Fortune: one mouse spins (its moves, ANALOGUE_1); its
+            # buttons leave the pad's to PUSH, and a touchpad (a position, not
+            # a move) would hold ANALOGUE_3, the stick's spin, off centre.
+            if kind == 'wof':
+                pointers = [p for p in pointers if p[1] == 'REL'][:1]
             for nplayer, (node, axis, keys) in enumerate(pointers[: max_players - gun_players], start=gun_players + 1):
                 evdev[f'ANALOGUE_{nplayer * 2 - 1}'] = f'{node}:{axis}:{ecodes.ABS_X if axis == "ABS" else ecodes.REL_X}'
                 evdev[f'ANALOGUE_{nplayer * 2}'] = f'{node}:{axis}:{ecodes.ABS_Y if axis == "ABS" else ecodes.REL_Y}'
+                if kind == 'wof':
+                    continue
                 for action, code in _POINTER_BUTTONS.items():
                     if code in keys:
                         evdev.setdefault(f'PLAYER_{nplayer}_{action}', f'{node}:KEY:{code}')
@@ -454,9 +505,8 @@ class LinuxloaderGenerator(Generator):
         config_file.write_text('\n'.join(lines))
         _logger.debug('linuxloader config (%s) %s:\n%s', kind, config_file, '\n'.join(lines))
 
-        if kind == 'halo':
-            return self._halo(game_dir, config_file)
-
+        if kind in ('halo', 'centipede'):
+            return self._g7(game_dir, config_file, kind, gameResolution)
         # Games kept in the cabinet's layout (Pink Panther Jewel Heist) have
         # the binary, its hasp/ and bezel.png in pm/, the cabinet's /pm.
         if not (game_dir / 'game').is_file() and (game_dir / 'pm' / 'game').is_file():
@@ -496,31 +546,36 @@ class LinuxloaderGenerator(Generator):
         )
 
     @staticmethod
-    def _halo(game_dir: Path, config_file: Path, /) -> Command.Command:
-        """Halo: Fireteam Raven, the 64-bit g7 title.
+    def _g7(game_dir: Path, config_file: Path, kind: str, resolution, /) -> Command.Command:
+        """The 64-bit g7 titles: Halo: Fireteam Raven, Centipede Chaos.
 
-        halo_rt.so rebuilds the dump's import table, answers the dongle and
+        g7_rt.so rebuilds the dump's import table, answers the dongle and
         maps the cabinet's /pm onto the install, so it has to be in the game
         before anything else runs: the dynamic linker is invoked by hand to
-        preload it.  The game is either in the cabinet's pm/g7/halo, /pm then
-        being two levels above it, or at the root of the game's folder, which
-        then stands for /pm as a whole.  Either way it is started from its own
-        directory, and lib/ there holds the fmod libraries Batocera does not
-        carry.  It takes the resolution, the gun border and the evdev input
-        from config_file, like the loader.
+        preload it.  The game is in the cabinet's pm/g7/<game> (or g7/<game>
+        at the root of the game's folder, which then stands for /pm), or at
+        the root of the game's folder.  Either way it is started from its own
+        directory, and lib/ there holds the libraries Batocera does not carry
+        (Halo's fmod).  The executable is the dump: game2 beside the original
+        game (Centipede), else game.  It takes the resolution, the gun border
+        and the evdev input from config_file, like the loader; Centipede has
+        its size on its command line, as the cabinet gives it.
         """
-        halo_dir = game_dir / 'pm' / 'g7' / 'halo'
-        if not (halo_dir / 'game').is_file():
-            halo_dir = game_dir
-        if not (halo_dir / 'game').is_file():
-            raise BatoceraException(f'No Halo executable at {game_dir / "game"} or {game_dir / "pm/g7/halo/game"}')
+        name = kind
+        candidates = [game_dir / 'pm' / 'g7' / name, game_dir / 'g7' / name, game_dir]
+        g7_dir = next((d for d in candidates if (d / 'game2').is_file() or (d / 'game').is_file()), None)
+        if g7_dir is None:
+            raise BatoceraException(f'No {name} executable in {", ".join(str(d) for d in candidates)}')
+        exe = './game2' if (g7_dir / 'game2').is_file() else './game'
+        args = [f'-f{resolution["width"]}x{resolution["height"]}'] if kind == 'centipede' else []
 
-        os.chdir(halo_dir)
+        os.chdir(g7_dir)
         return Command.Command(
             array=[
                 '/lib64/ld-linux-x86-64.so.2',
-                '--preload', str(LINUXLOADER_DIR / 'halo_rt.so'),
-                './game',
+                '--preload', str(LINUXLOADER_DIR / 'g7_rt.so'),
+                exe,
+                *args,
             ],
             env={
                 'LD_LIBRARY_PATH': 'lib',
