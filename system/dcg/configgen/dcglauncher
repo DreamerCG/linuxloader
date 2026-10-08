@@ -1,28 +1,78 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+"""Launcher DCG : branche nos generateurs sur Batocera (< 44 et >= 44).
+
+Batocera 44 resout certains emulateurs ('wine', 'linuxloader') vers ses propres
+classes natives, avant de consulter get_generator. Pour que NOS generateurs
+soient utilises, on reecrit le nom de l'emulateur (-emulator) en un nom
+inconnu de Batocera ('wine-dcg', 'linuxloader-dcg') : il retombe alors sur le
+chemin de compatibilite configgen, qui appelle get_generator.
+"""
 import re
-import sys
-import os
 import subprocess
-import yaml
-
+import sys
 from importlib import import_module
-import configgen
-from configgen.Emulator import Emulator, _dict_merge, _load_defaults, _load_system_config
-from configgen.emulatorlauncher import launch
-from configgen.generators import get_generator
-from typing import TYPE_CHECKING, Any
-from pathlib import Path
 
-rom = None
-if "-rom" in sys.argv:
-    rom = sys.argv[sys.argv.index("-rom") + 1]
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 
-if "-emulator" in sys.argv:
-    emulator_name = sys.argv[sys.argv.index("-emulator") + 1]
+# nom d'emulateur -> (module, classe) de notre generateur
+CUSTOM_GENERATORS = {
+    'wine-dcg': ('generators.wine.wineGenerator', 'WineGenerator'),
+    'linuxloader-dcg': ('generators.linuxloader.linuxloaderGenerator', 'LinuxloaderGenerator'),
+}
 
-def _detect_batocera_version() -> int | None:
+# Emulateurs geres par nos generateurs : on ne force pas -system windows pour eux.
+CUSTOM_EMULATORS = frozenset(CUSTOM_GENERATORS)
 
+# Renommages appliques sur toutes les versions de Batocera.
+EMULATOR_RENAMES = {'linuxloader': 'linuxloader-dcg'}
+
+# Batocera >= 44 uniquement : 'wine' passe par notre WineGenerator pour ces
+# systemes. Les autres (dont 'windows') gardent le wine natif de Batocera.
+DCG_WINE_SYSTEMS = {'teknoparrot'}
+
+
+# ---------------------------------------------------------------------------
+# Utilitaires
+# ---------------------------------------------------------------------------
+
+def log(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
+def get_arg(flag: str) -> str | None:
+    """Valeur qui suit `flag` dans sys.argv, ou None."""
+    if flag in sys.argv:
+        index = sys.argv.index(flag) + 1
+        if index < len(sys.argv):
+            return sys.argv[index]
+    return None
+
+
+def set_arg(flag: str, value: str) -> None:
+    sys.argv[sys.argv.index(flag) + 1] = value
+
+
+def force_windows_system(reason: str) -> None:
+    """Fait croire a Batocera qu'on lance un jeu du systeme 'windows'."""
+    if "-system" not in sys.argv:
+        return
+    set_arg("-system", "windows")
+    log(f"[DCG] forcing system=windows ({reason})")
+
+
+def load_custom_generator(emulator: str):
+    """Instance de notre generateur pour `emulator`, ou None s'il n'en a pas."""
+    entry = CUSTOM_GENERATORS.get(emulator)
+    if entry is None:
+        return None
+    module_name, class_name = entry
+    return getattr(import_module(module_name), class_name)()
+
+
+def detect_batocera_version() -> int | None:
     try:
         result = subprocess.run(
             ["batocera-es-swissknife", "--version"],
@@ -31,80 +81,111 @@ def _detect_batocera_version() -> int | None:
     except (OSError, subprocess.CalledProcessError):
         return None
 
-    m = re.search(r"^\s*(\d+)", result.stdout)
-    if not m:
-        return None
-    return int(m.group(1))
+    match = re.search(r"^\s*(\d+)", result.stdout)
+    return int(match.group(1)) if match else None
 
-def _new_get_generator(emulator: str, core: str | None = None):
-    
-    print(f"Selected emulator: {emulator}", file=sys.stderr)    
-    print(f"Selected Rom : {rom}", file=sys.stderr)    
-    print(f"Selected Core : {core}", file=sys.stderr)    
 
-    if emulator == 'play':
-        from generators.namco2x6.playGenerator import PlayGenerator
-        return PlayGenerator()
-		
-    if emulator == 'rpcs3':
-        from generators.rcps3.rpcs3Generator import Rpcs3Generator
-        return Rpcs3Generator()		
+def rename_emulator() -> str | None:
+    """Applique EMULATOR_RENAMES a -emulator et renvoie le nom final."""
+    emulator = get_arg("-emulator")
+    if emulator in EMULATOR_RENAMES:
+        new_name = EMULATOR_RENAMES[emulator]
+        log(f"[DCG] renaming emulator {emulator} -> {new_name}")
+        set_arg("-emulator", new_name)
+        emulator = new_name
+    return emulator
 
-    if emulator == 'wine':
-        from generators.wine.wineGenerator import WineGenerator
-        return WineGenerator()    
 
-    if emulator == 'demul':
-        from generators.demul.demulGenerator import DemulGenerator
-        return DemulGenerator()
+# ---------------------------------------------------------------------------
+# Batocera >= 44
+# ---------------------------------------------------------------------------
 
-    if emulator == 'shadps4':
-        from generators.shadps4.shadPS4Generator import shadPS4Generator
-        return shadPS4Generator()
+def run_new_api(emulator: str | None) -> None:
+    import runpy
+    import configgen.generators.importer
 
-    if emulator == 'linuxloader':
-        from generators.linuxloader.linuxloaderGenerator import LinuxloaderGenerator
-        return LinuxloaderGenerator()
+    system = get_arg("-system")
 
-    # ==========================================
-    # FALLBACK TO BATOCERA
-    # ==========================================
+    # 'wine' est natif en v44 : on le redirige vers notre generateur pour nos systemes.
+    if emulator == 'wine' and system in DCG_WINE_SYSTEMS:
+        emulator = 'wine-dcg'
+        set_arg("-emulator", emulator)
+        log(f"[DCG] wine -> wine-dcg (system={system})")
 
-    if "-system" in sys.argv:
-        sys.argv[sys.argv.index("-system") + 1] = "windows"
-        print(
-            "Fallback to Batocera generator: forcing system=windows",
-            file=sys.stderr
-        )
-        system_name = sys.argv[sys.argv.index("-system") + 1]
-        print("Debug System :", system_name, file= sys.stderr)
+    log(f"Selected emulator: {emulator}")
+    log(f"Selected Rom : {get_arg('-rom')}")
 
-    return get_generator(emulator)
+    original_get_generator = configgen.generators.importer.get_generator
 
-from configgen.batoceraPaths import DEFAULTS_DIR
-configgen.emulatorlauncher.get_generator = _new_get_generator
+    def dcg_get_generator(name: str, core: str | None = None):
+        log(f"[DCG] get_generator emulator={name} core={core}")
+        generator = load_custom_generator(name)
+        if generator is not None:
+            return generator
+        return original_get_generator(name, core)
 
-if __name__ == "__main__":
+    # On remplace get_generator partout ou Batocera peut l'avoir importe.
+    configgen.generators.importer.get_generator = dcg_get_generator
+    for module_name in ("configgen.launch", "configgen.emulatorlauncher"):
+        try:
+            module = import_module(module_name)
+        except ImportError:
+            continue
+        module.get_generator = dcg_get_generator
 
-    print(f"Custom generator: {emulator_name}", file=sys.stderr)
+    if emulator not in CUSTOM_EMULATORS:
+        force_windows_system("emulateur sans generateur DCG")
 
-    if emulator_name not in (
-        'play',
-        'rpcs3',
-        'demul',
-        'shadps4',
-        'wine',
-        'linuxloader',
-    ):
-        if "-system" in sys.argv:
-            system_index = sys.argv.index("-system")
-            sys.argv[system_index + 1] = "windows"
+    log(f"[DCG] argv: {sys.argv}")
+    runpy.run_module('batocera_launch', run_name='__main__')
 
-            print(
-                "No custom generator - forcing system=windows",
-                file=sys.stderr
-            )
+
+# ---------------------------------------------------------------------------
+# Batocera < 44
+# ---------------------------------------------------------------------------
+
+def run_old_api(emulator: str | None) -> None:
+    import configgen.emulatorlauncher
+    from configgen.emulatorlauncher import launch
+    from configgen.generators import get_generator
+
+    def legacy_get_generator(name: str, core: str | None = None):
+        log(f"Selected emulator: {name}")
+        log(f"Selected Rom : {get_arg('-rom')}")
+        log(f"Selected Core : {core}")
+
+        # Avant la 44, 'wine' est entierement pris en charge par notre WineGenerator.
+        generator = load_custom_generator('wine-dcg' if name == 'wine' else name)
+        if generator is not None:
+            return generator
+
+        force_windows_system("fallback Batocera")
+        return get_generator(name, core)
+
+    configgen.emulatorlauncher.get_generator = legacy_get_generator
+
+    log(f"Custom generator: {emulator}")
+    if emulator not in CUSTOM_EMULATORS | {'wine'}:
+        force_windows_system("emulateur sans generateur DCG")
 
     sys.argv[0] = re.sub(r"(-script\.pyw|\.exe)?$", "", sys.argv[0])
-
     sys.exit(launch())
+
+
+# ---------------------------------------------------------------------------
+# Point d'entree
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    emulator = rename_emulator()
+    version = detect_batocera_version()
+    log(f"Batocera Version : {version}")
+
+    if version is not None and version >= 44:
+        run_new_api(emulator)
+    else:
+        run_old_api(emulator)
+
+
+if __name__ == "__main__":
+    main()

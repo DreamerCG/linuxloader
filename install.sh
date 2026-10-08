@@ -225,16 +225,3 @@ printf   "${B}${C}║${N}                                              ${B}${C}�
 printf   "${B}${C}║${N}   pour leur travail et leur passion !        ${B}${C}║${N}\n"
 printf   "${B}${C}║${N}                                              ${B}${C}║${N}\n"
 printf   "${B}${C}╚══════════════════════════════════════════════╝${N}\n"
-
-# --- Redémarrage optionnel d'EmulationStation ------------------------------
-# (le script est lu via un pipe : on interroge le clavier via /dev/tty)
-if [ -z "$DCG_NONINTERACTIVE" ] && [ -r /dev/tty ] && command -v batocera-es-swissknife >/dev/null 2>&1; then
-    printf "\n${B}Redémarrer EmulationStation maintenant ? [o/N] ${N}"
-    read -r answer < /dev/tty || answer=""
-    case "$answer" in
-        o|O|y|Y|oui|OUI) batocera-es-swissknife --restart ;;
-        *) printf "OK. Redémarrez plus tard : Menu > Paramètres > Redémarrer.\n" ;;
-    esac
-else
-    printf "  Redémarrez EmulationStation pour voir le système.\n"
-fi
