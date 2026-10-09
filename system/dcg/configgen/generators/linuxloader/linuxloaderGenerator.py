@@ -33,20 +33,22 @@ _logger = logging.getLogger(__name__)
 # kept in /userdata/saves/<system>/<rom name> (logs, settings, calibration).
 #
 # Controls are set per game kind, from the rom name: gun games (default),
-# driving (Cruis'n Blast) and joystick (Galaga Assault, Pac-Man Chomp
-# Mania, Pink Panther Jewel Heist). On every pad, Start starts, Select
+# driving (Cruis'n Blast), joystick (Galaga Assault, Pac-Man Chomp
+# Mania, Pink Panther Jewel Heist) and Wheel of Fortune's spinner (wof). On every pad, Start starts, Select
 # inserts a coin, R3 is the test switch and L3 service.
 #
 # Angry Birds Arcade is a gun game here: its cabinet fires balls with a
 # slingshot at a touch frame, which linuxloader answers with P1's gun (or a
-# mouse), each pull of the trigger a hit where it aims.#
+# mouse), each pull of the trigger a hit where it aims.
+#
 # Driving: a wheel or a pad steers the same way (left stick or wheel, R2 gas,
 # L2 brake); the device steering also gets the game's force feedback, a
 # wheel's motor force or, on a pad, a rumble (linuxloader picks it from
 # ANALOGUE_1).
 #
 # MotoGP rides the same way (left stick or wheel leans, R2 throttle, L2
-# brake); up/down are its volume buttons, the menus' up and down.#
+# brake); up/down are its volume buttons, the menus' up and down.
+#
 # The Namco ES1 games run through linuxloader too. Each rom is the cabinet's
 # /opt/arcade/exec (a.elf at its top, with data/ and the save directories),
 # and lib/ for what Batocera does not carry: sdl12-compat (libSDL-1.2.so.0)
@@ -60,12 +62,34 @@ _logger = logging.getLogger(__name__)
 # _PAD_DHRIDERS). Maximum Heat 3D (Dead Heat's later build) drives as Dead
 # Heat.
 #
-# Halo: Fireteam Raven and Centipede Chaos are the exception. They are 64-bit
-# g7 titles, so the 32-bit loader cannot host them: they run under g7_rt.so
-# instead, preloaded into the game by the dynamic linker. g7_rt.so reads the
-# same linuxloader.ini (named by LINUXLOADER_CONFIG): resolution, gun border
-# and, for Halo, the [EVDEV] map below. Centipede reads the keyboard and the
-# gamepads itself (the first three pads are players 1 to 3).
+# The Teamplay games (Crossfire Maximum Paintball, Police Trainer 2) are gun
+# games, their dumps run through the host's dynamic linker by the loader.
+# Police Trainer 2 starts its sound daemon itself, "./pt2snd": a copy of the
+# dump that lost it (a symlink flattened into a file naming pt2snd.f7, the
+# daemon without its executable mode) is repaired before the game starts.
+#
+# America's Army (Global VR) is a gun game run from its System/ directory
+# (armyops-bin); linuxloader serves its cabinet's I/O link and, with the
+# CROSSHAIR option, draws a crosshair per gun, its arcade HUD showing none.
+# It plays free (no operator menu): FREEPLAY = false gives coins back.
+#
+# Halo: Fireteam Raven and Centipede Chaos are 64-bit g7 titles: linuxloader
+# hands them to linuxloader64, which preloads linuxloader64.so into the game
+# by the dynamic linker. It reads the same linuxloader.ini: resolution, gun
+# border and, for Halo, the [EVDEV] map below. Centipede reads the keyboard
+# and the gamepads itself (the first three pads are players 1 to 3).
+#
+# Nerf Arcade is a 64-bit Unity game: linuxloader hands it to linuxloader64,
+# which runs it under Unity's own Linux player, kept with the game (its
+# unity/<version>, see linuxloader's tools/unity-player.sh), with
+# linuxloader64.so standing in for its cabinet's I/O board and dongle. It is
+# a gun game, two guns; it renders at its cabinet's 1920x1080 only (its shots
+# need that size), so it runs fullscreen and Unity scales it to the screen.
+#
+# Superbikes 3 is one too (its rom holds fnfmega_Data, the player in its
+# unity/ and FMOD 1.10's Linux libraries in fnfmega_Data/Plugins/x86_64, see
+# linuxloader's docs/superbikes3.md). It rides as the driving games (left
+# stick or wheel leans, R2 throttle, L2 or y brake, b view, a music).
 
 LINUXLOADER_DIR: Final = Path('/userdata/system/dcg/emulators/linuxloader')
 LINUXLOADER_CONFIG: Final = CONFIGS / 'linuxloader'
@@ -262,6 +286,31 @@ def _pointers(guns, /) -> list[tuple[str, str, set[int]]]:
     return [(node, axis, keys) for _, node, axis, keys in sorted(found)]
 
 
+def _fix_pt2_sound_daemon(game_dir: Path, /) -> None:
+    """Police Trainer 2's pt2snd: a symlink to pt2snd.f7, executable."""
+    link = game_dir / 'pt2snd'
+    if not (game_dir / 'pt2s_g11').is_file() or not link.exists():
+        return
+    try:
+        # A flattened symlink: a small file holding its target's name.
+        if not link.is_symlink() and link.stat().st_size < 64:
+            target = link.read_text(errors='replace').strip()
+            if target and '/' not in target and (game_dir / target).is_file():
+                link.unlink()
+                link.symlink_to(target)
+                _logger.info('linuxloader: %s -> %s restored', link, target)
+        daemon = link.resolve()
+        if not os.access(daemon, os.X_OK):
+            daemon.chmod(daemon.stat().st_mode | 0o111)
+            _logger.info('linuxloader: %s made executable', daemon)
+    except OSError as e:
+        _logger.warning('linuxloader: cannot repair %s (%s), the game will have no sound', link, e)
+
+
+def _is_nerf(rom: Path, /) -> bool:
+    return 'nerf' in rom.name.lower()
+
+
 def _game_kind(rom: Path, /) -> str:
     name = rom.name.lower()
     if 'halo' in name:
@@ -269,6 +318,9 @@ def _game_kind(rom: Path, /) -> str:
     if 'centipede' in name:
         return 'centipede'
     if 'cruis' in name:
+        return 'driving'
+    # Superbikes 3: a handlebar, a throttle and a brake, as the driving games.
+    if 'superbikes' in re.sub(r'[^a-z]', '', name):
         return 'driving'
     # MotoGP (Raw Thrills): a bike steered, accelerated and braked as the
     # driving games; up/down are its volume buttons.
@@ -336,7 +388,7 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         if nplayer == 1 or not action.startswith('TEST'):
             _set(evdev, key, _pad_input(pad, name, digital=True))
 
-    if kind in ('driving', 'bike', 'deadheat', 'dhriders', 'tank'):
+    if kind in ('driving', 'motogp', 'bike', 'deadheat', 'dhriders', 'tank'):
         if nplayer != 1:
             return
         _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
@@ -425,9 +477,13 @@ class LinuxloaderGenerator(Generator):
                 'KEEP_ASPECT_RATIO': '0' if system.config.get('keep_aspect_ratio') == 'off' else '1',
             },
             'Input': {'INPUT_MODE': '2'},
+            'CrossHairs': {'ENABLE_CROSSHAIRS': '1' if system.config.get_bool('linuxloader_crosshair') else '0'},
             'EVDEV': {},
         }
         evdev = conf['EVDEV']
+        if _is_nerf(rom):
+            conf['Display']['FULLSCREEN'] = '1'
+
         # DEBUG: état de départ
         print("linuxloader kind :", kind, file=sys.stderr)
         print("linuxloader rom :", rom, file=sys.stderr)
@@ -436,7 +492,7 @@ class LinuxloaderGenerator(Generator):
         for g in guns:
             print("linuxloader gun :", g.node, "buttons:", g.buttons, "needs_borders:", g.needs_borders, file=sys.stderr)
         print("linuxloader pads :", [(p.index, p.device_path, p.real_name) for p in playersControllers], file=sys.stderr)
-        
+
         # Guns (gun games): P1 on ANALOGUE_1/2, P2 on ANALOGUE_3/4, and so on;
         # then mice and touchpads for the players left, in their order.
         # Halo runs as its 4 player cabinet; the other games have 2 players.
@@ -505,12 +561,14 @@ class LinuxloaderGenerator(Generator):
         config_file.write_text('\n'.join(lines))
         _logger.debug('linuxloader config (%s) %s:\n%s', kind, config_file, '\n'.join(lines))
 
-        if kind in ('halo', 'centipede'):
-            return self._g7(game_dir, config_file, kind, gameResolution)
         # Games kept in the cabinet's layout (Pink Panther Jewel Heist) have
         # the binary, its hasp/ and bezel.png in pm/, the cabinet's /pm.
         if not (game_dir / 'game').is_file() and (game_dir / 'pm' / 'game').is_file():
             game_dir = game_dir / 'pm'
+        # America's Army (Global VR) runs from its System/ directory.
+        if (game_dir / 'System' / 'armyops-bin').is_file():
+            game_dir = game_dir / 'System'
+        _fix_pt2_sound_daemon(game_dir)
         command = [str(LINUXLOADER_DIR / 'linuxloader'), '-g', str(game_dir), '-c', str(config_file)]
         if system.config.get_bool('linuxloader_test'):
             command.append('-t')
@@ -542,46 +600,5 @@ class LinuxloaderGenerator(Generator):
                 'PIPEWIRE_MODULE_DIR': '/lib32/pipewire-0.3:/usr/lib/pipewire-0.3',
                 'SDL_GAMECONTROLLERCONFIG': generate_sdl_game_controller_config(playersControllers),
                 'SDL_JOYSTICK_HIDAPI': '0',
-            },
-        )
-
-    @staticmethod
-    def _g7(game_dir: Path, config_file: Path, kind: str, resolution, /) -> Command.Command:
-        """The 64-bit g7 titles: Halo: Fireteam Raven, Centipede Chaos.
-
-        g7_rt.so rebuilds the dump's import table, answers the dongle and
-        maps the cabinet's /pm onto the install, so it has to be in the game
-        before anything else runs: the dynamic linker is invoked by hand to
-        preload it.  The game is in the cabinet's pm/g7/<game> (or g7/<game>
-        at the root of the game's folder, which then stands for /pm), or at
-        the root of the game's folder.  Either way it is started from its own
-        directory, and lib/ there holds the libraries Batocera does not carry
-        (Halo's fmod).  The executable is the dump: game2 beside the original
-        game (Centipede), else game.  It takes the resolution, the gun border
-        and the evdev input from config_file, like the loader; Centipede has
-        its size on its command line, as the cabinet gives it.
-        """
-        name = kind
-        candidates = [game_dir / 'pm' / 'g7' / name, game_dir / 'g7' / name, game_dir]
-        g7_dir = next((d for d in candidates if (d / 'game2').is_file() or (d / 'game').is_file()), None)
-        if g7_dir is None:
-            raise BatoceraException(f'No {name} executable in {", ".join(str(d) for d in candidates)}')
-        exe = './game2' if (g7_dir / 'game2').is_file() else './game'
-        args = [f'-f{resolution["width"]}x{resolution["height"]}'] if kind == 'centipede' else []
-
-        os.chdir(g7_dir)
-        return Command.Command(
-            array=[
-                '/lib64/ld-linux-x86-64.so.2',
-                '--preload', str(LINUXLOADER_DIR / 'g7_rt.so'),
-                exe,
-                *args,
-            ],
-            env={
-                'LD_LIBRARY_PATH': 'lib',
-                # The import table is rebuilt up front, so nothing may be
-                # left for a lazy resolution that would run against it.
-                'LD_BIND_NOW': '1',
-                'LINUXLOADER_CONFIG': str(config_file),
             },
         )
