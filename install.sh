@@ -87,7 +87,23 @@ fi
 step "Copie des fichiers vers $DEST/system"
 mkdir -p "$DEST/system"
 cp -a "$SRC/system/." "$DEST/system/"
-ok "Fichiers copiés (fusion avec l'existant, rien n'est supprimé)"
+ok "Fichiers copiés"
+
+# Supprime uniquement les bibliothèques LinuxLoader qui ne sont plus dans
+# l'archive courante. Les autres fichiers utilisateur restent intacts.
+SRC_LL="$SRC/system/dcg/emulators/linuxloader"
+DEST_LL="$DEST/system/dcg/emulators/linuxloader"
+REMOVED_SO=0
+if [ -d "$SRC_LL" ] && [ -d "$DEST_LL" ]; then
+    while IFS= read -r -d '' old_so; do
+        relative="${old_so#"$DEST_LL"/}"
+        if [ ! -f "$SRC_LL/$relative" ]; then
+            rm -f "$old_so"
+            REMOVED_SO=$((REMOVED_SO + 1))
+        fi
+    done < <(find "$DEST_LL" -type f -name '*.so' -print0)
+fi
+ok "$REMOVED_SO bibliothèque(s) .so obsolète(s) supprimée(s)"
 
 # --- 5. Finalisation -------------------------------------------------------
 step "Finalisation (fins de ligne, droits, dossiers)"

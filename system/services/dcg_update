@@ -79,30 +79,46 @@ check_update() {
     mkdir -p "$(dirname "$LOG")"
 
     # attend le réseau (~60 s max)
+    echo "Vérification de la version distante..."
     remote=""
     for _ in $(seq 1 30); do
         remote="$(curl -fs --max-time 5 "$REPO_RAW/VERSION" | tr -d '[:space:]')"
         [ -n "$remote" ] && break
         sleep 2
     done
-    [ -z "$remote" ] && { log "version distante injoignable"; return; }
+    if [ -z "$remote" ]; then
+        log "version distante injoignable après 30 tentatives"
+        echo "Mise à jour impossible : version distante injoignable. Consulte $LOG"
+        return 1
+    fi
 
     local_v="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null)"
     local_v="${local_v:-0}"
     log "locale=$local_v distante=$remote"
+    echo "Version installée : $local_v ; version distante : $remote"
 
     if version_gt "$remote" "$local_v"; then
         log "mise à jour vers $remote"
+        echo "Mise à jour vers $remote..."
         if curl -fsL --retry 3 "$REPO_RAW/install.sh" -o /tmp/dcg_install.sh; then
             if DCG_NONINTERACTIVE=1 bash /tmp/dcg_install.sh >> "$LOG" 2>&1; then
                 log "mise à jour terminée"
+                echo "Mise à jour terminée."
             else
                 log "ÉCHEC de l'installation"
+                echo "Échec de l'installation. Consulte $LOG"
+                rm -f /tmp/dcg_install.sh
+                return 1
             fi
         else
             log "téléchargement de install.sh impossible"
+            echo "Téléchargement de install.sh impossible. Consulte $LOG"
+            return 1
         fi
         rm -f /tmp/dcg_install.sh
+    else
+        log "aucune mise à jour nécessaire"
+        echo "Aucune mise à jour nécessaire."
     fi
 }
 
@@ -114,9 +130,14 @@ main() {
             ( scan_teknoparrot_roms; fix_linuxloader_permissions; check_update ) >/dev/null 2>&1 &
             ;;
         scan)   scan_teknoparrot_roms; fix_linuxloader_permissions ;;
+        update)
+            scan_teknoparrot_roms
+            fix_linuxloader_permissions
+            check_update
+            ;;
         stop)   ;;
         status) cat "$VERSION_FILE" 2>/dev/null || echo "inconnue" ;;
-        *)      scan_teknoparrot_roms ;;
+        *)      scan_teknoparrot_roms; fix_linuxloader_permissions; check_update ;;
     esac
 }
 
