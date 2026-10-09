@@ -122,9 +122,7 @@ chmod +x "$DEST/system/dcg/bin/batocera-wine-guns" 2>/dev/null || true
 
 LL="$DEST/system/dcg/emulators/linuxloader"
 if [ -d "$LL" ]; then
-    chmod +x "$LL/linuxloader" "$LL"/*.so 2>/dev/null || true
-    # Contenu du dossier lib/ (bibliothèques requises par linuxloader)
-    [ -d "$LL/lib" ] && find "$LL/lib" -type f -exec chmod +x {} +
+    chmod -R 755 "$LL"
 fi
 ok "Droits d'exécution appliqués"
 

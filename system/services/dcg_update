@@ -65,12 +65,12 @@ scan_teknoparrot_roms() {
 
 fix_linuxloader_permissions() {
     [ -d "$LINUXLOADER_DIR" ] || return 0
-    find "$LINUXLOADER_DIR" -type f -name '*.so' -exec chmod a+x {} + 2>/dev/null
+    chmod -R 755 "$LINUXLOADER_DIR" 2>/dev/null
     local result=$?
     if [ "$result" -eq 0 ]; then
-        log "permissions exécutables appliquées aux bibliothèques .so de LinuxLoader"
+        log "permissions 755 appliquées à tout le dossier LinuxLoader"
     else
-        log "ÉCHEC de l'application des permissions aux bibliothèques .so de LinuxLoader"
+        log "ÉCHEC de l'application des permissions 755 au dossier LinuxLoader"
     fi
     return 0
 }
