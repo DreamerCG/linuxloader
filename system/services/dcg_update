@@ -7,6 +7,7 @@ VERSION_FILE="/userdata/system/dcg/VERSION"
 LOG="/userdata/system/logs/dcg_update.log"
 BATOCERA_CONF="/userdata/system/batocera.conf"
 TEKNOPARROT_ROMS="/userdata/roms/teknoparrot"
+LINUXLOADER_DIR="/userdata/system/dcg/emulators/linuxloader"
 
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 
@@ -62,6 +63,18 @@ scan_teknoparrot_roms() {
     echo "Scan TeknoParrot terminé : $added réglage(s) ajouté(s), $skipped déjà défini(s)."
 }
 
+fix_linuxloader_permissions() {
+    [ -d "$LINUXLOADER_DIR" ] || return 0
+    find "$LINUXLOADER_DIR" -type f -name '*.so' -exec chmod a+x {} + 2>/dev/null
+    local result=$?
+    if [ "$result" -eq 0 ]; then
+        log "permissions exécutables appliquées aux bibliothèques .so de LinuxLoader"
+    else
+        log "ÉCHEC de l'application des permissions aux bibliothèques .so de LinuxLoader"
+    fi
+    return 0
+}
+
 check_update() {
     mkdir -p "$(dirname "$LOG")"
 
@@ -98,9 +111,9 @@ main() {
         start)
             # En arrière-plan : ne bloque pas le boot. Le scan passe avant
             # l'éventuelle mise à jour qui peut elle aussi modifier batocera.conf.
-            ( scan_teknoparrot_roms; check_update ) >/dev/null 2>&1 &
+            ( scan_teknoparrot_roms; fix_linuxloader_permissions; check_update ) >/dev/null 2>&1 &
             ;;
-        scan)   scan_teknoparrot_roms ;;
+        scan)   scan_teknoparrot_roms; fix_linuxloader_permissions ;;
         stop)   ;;
         status) cat "$VERSION_FILE" 2>/dev/null || echo "inconnue" ;;
         *)      scan_teknoparrot_roms ;;
