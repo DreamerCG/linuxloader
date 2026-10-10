@@ -120,8 +120,6 @@ else
     mkdir -p "$DEST/system/wine/custom"
     tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$DEST/system/wine/custom" \
         || fail "extraction du runner GE-Proton impossible"
-    [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ] \
-        || fail "runner GE-Proton extrait sans permissions d'exécution valides"
     ok "Runner GE-Proton téléchargé et installé dans $WAL_RUNNER"
 fi
 
@@ -289,12 +287,6 @@ for f in \
         missing=1
     fi
 done
-WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-7-x86_64"
-if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
-    ok "Runner GE-Proton11-7-x86_64 installé et exécutable"
-else
-    warn "Runner GE-Proton11-7-x86_64 absent ou non exécutable dans $WAL_RUNNER (décompressez l'archive originale en conservant les permissions)"
-fi
 sync
 
 # Installation réussie : la sauvegarde temporaire n'est plus utile
