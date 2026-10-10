@@ -510,8 +510,6 @@ class LinuxloaderGenerator(Generator):
                 print("evdev after guns :", evdev, file=sys.stderr)
                 print("gun_players :", gun_players, file=sys.stderr)                
                 if kind == 'halo':
-                    pointers = _pointers(guns if system.config.use_guns and guns else [])
-                    print("linuxloader pointers :", pointers, file=sys.stderr)
                     buttons = _HALO_GUN_BUTTONS
                 elif '1' in gun.buttons:
                     buttons = _GUN_BUTTONS_WITH_START

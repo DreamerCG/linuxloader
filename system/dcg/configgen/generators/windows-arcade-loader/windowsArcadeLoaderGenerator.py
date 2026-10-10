@@ -54,8 +54,6 @@ print(f" WAL_CONFIG : {WAL_CONFIG}", file=sys.stderr)
 print(f" ===================================", file=sys.stderr)
 
 
-
-
 _GAMESCOPE_SWITCHES: Final = {'gamescope_hdr', 'gamescope_hdr_itm_enabled'}
 
 
