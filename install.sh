@@ -121,12 +121,22 @@ else
     mkdir -p "$WAL_RUNNER_EXTRACT"
     tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_EXTRACT" \
         || fail "extraction du runner GE-Proton impossible"
-    WAL_RUNNER_FILES="$(find "$WAL_RUNNER_EXTRACT" -type d -name files -print -quit)"
+    # La release a une enveloppe Proton (proton, protonfixes, etc.) et les
+    # fichiers Wine attendus sont dans <release>/files/{bin,lib,share}.
+    WAL_RUNNER_FILES="$(find "$WAL_RUNNER_EXTRACT" -mindepth 2 -maxdepth 2 -type d -name files -print -quit)"
     [ -n "$WAL_RUNNER_FILES" ] || fail "dossier files introuvable dans l'archive GE-Proton"
+    for dir in bin lib share; do
+        [ -d "$WAL_RUNNER_FILES/$dir" ] \
+            || fail "dossier $dir introuvable dans $WAL_RUNNER_FILES"
+    done
     rm -rf "$WAL_RUNNER"
     mkdir -p "$WAL_RUNNER"
     cp -a "$WAL_RUNNER_FILES/." "$WAL_RUNNER/" \
         || fail "installation des fichiers Wine du runner GE-Proton impossible"
+    [ -x "$WAL_RUNNER/bin/wine" ] \
+        || fail "le runner extrait ne contient pas bin/wine exécutable dans $WAL_RUNNER"
+    [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ] \
+        || fail "le runner extrait ne contient pas lib/wine/x86_64-unix/wine exécutable dans $WAL_RUNNER"
     ok "Runner GE-Proton téléchargé et installé dans $WAL_RUNNER"
 fi
 
