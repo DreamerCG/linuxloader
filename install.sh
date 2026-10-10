@@ -117,9 +117,16 @@ else
         fail "ni curl ni wget n'est disponible pour télécharger le runner GE-Proton"
     fi
     gzip -t "$WAL_RUNNER_ARCHIVE" || fail "archive GE-Proton invalide ou incomplète"
-    mkdir -p "$DEST/system/wine/custom"
-    tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$DEST/system/wine/custom" \
+    WAL_RUNNER_EXTRACT="$WORK/runner-extract"
+    mkdir -p "$WAL_RUNNER_EXTRACT"
+    tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_EXTRACT" \
         || fail "extraction du runner GE-Proton impossible"
+    WAL_RUNNER_FILES="$(find "$WAL_RUNNER_EXTRACT" -type d -name files -print -quit)"
+    [ -n "$WAL_RUNNER_FILES" ] || fail "dossier files introuvable dans l'archive GE-Proton"
+    rm -rf "$WAL_RUNNER"
+    mkdir -p "$WAL_RUNNER"
+    cp -a "$WAL_RUNNER_FILES/." "$WAL_RUNNER/" \
+        || fail "installation des fichiers Wine du runner GE-Proton impossible"
     ok "Runner GE-Proton téléchargé et installé dans $WAL_RUNNER"
 fi
 
