@@ -8,6 +8,8 @@
 set -e
 
 REPO_URL="${ARCHIVE_URL:-https://github.com/DreamerCG/linuxloader/archive/refs/heads/main.tar.gz}"
+WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz}"
+WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7-x86_64.tar.gz}"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
 WORK="$DEST/system/.dcg_install_tmp"
@@ -25,6 +27,27 @@ step() { STEP=$((STEP + 1)); printf "\n${B}${C}[%s/%s]${N} ${B}%s${N}\n" "$STEP"
 ok()   { printf "  ${G}✔${N} %s\n" "$1"; }
 warn() { printf "  ${Y}!${N} %s\n" "$1"; }
 fail() { printf "\n${R}✘ ERREUR : %s${N}\n" "$1"; exit 1; }
+
+resolve_lfs_archive() {
+    local archive="$1" url="$2" label="$3"
+    [ -f "$archive" ] || return 0
+    if head -n 1 "$archive" | grep -qF 'version https://git-lfs.github.com/spec/v1'; then
+        printf "  Récupération de %s stocké avec Git LFS...\n" "$label"
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsL --retry 5 --retry-delay 2 -o "$archive" "$url" \
+                || fail "téléchargement LFS impossible : $label"
+        elif command -v wget >/dev/null 2>&1; then
+            wget -q -O "$archive" "$url" \
+                || fail "téléchargement LFS impossible : $label"
+        else
+            fail "ni curl ni wget n'est disponible pour télécharger $label via Git LFS"
+        fi
+        head -n 1 "$archive" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
+            && fail "GitHub a renvoyé le pointeur LFS au lieu de $label"
+        ok "$label téléchargé"
+    fi
+    gzip -t "$archive" || fail "archive invalide ou incomplète : $label"
+}
 
 cleanup() {
     code=$?
@@ -64,6 +87,44 @@ rm -f "$WORK/archive.tar.gz"
 # L'archive GitHub contient un dossier racine (ex: linuxloader-main/)
 SRC="$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 [ -n "$SRC" ] && [ -d "$SRC/system" ] || fail "dossier 'system' introuvable dans l'archive"
+
+WAL_PREFIX="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
+INSTALLED_WAL_PREFIX="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
+if [ -f "$INSTALLED_WAL_PREFIX" ] \
+    && ! head -n 1 "$INSTALLED_WAL_PREFIX" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
+    && gzip -t "$INSTALLED_WAL_PREFIX" >/dev/null 2>&1; then
+    cp -p "$INSTALLED_WAL_PREFIX" "$WAL_PREFIX" \
+        || fail "réutilisation de l'archive du préfixe Wine installée impossible"
+    ok "Archive du préfixe Wine déjà installée, téléchargement ignoré"
+else
+    resolve_lfs_archive "$WAL_PREFIX" "$WAL_PREFIX_URL" "l'archive du préfixe Wine"
+fi
+
+# Le runner vient directement de la release officielle. L'extraction avec tar
+# préserve les permissions d'exécution nécessaires aux binaires Wine.
+WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-7-x86_64"
+if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
+    ok "Runner GE-Proton déjà installé, téléchargement ignoré"
+else
+    WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-7-x86_64.tar.gz"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsL --retry 5 --retry-delay 2 -o "$WAL_RUNNER_ARCHIVE" "$WAL_RUNNER_URL" \
+            || fail "téléchargement du runner GE-Proton impossible"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$WAL_RUNNER_ARCHIVE" "$WAL_RUNNER_URL" \
+            || fail "téléchargement du runner GE-Proton impossible"
+    else
+        fail "ni curl ni wget n'est disponible pour télécharger le runner GE-Proton"
+    fi
+    gzip -t "$WAL_RUNNER_ARCHIVE" || fail "archive GE-Proton invalide ou incomplète"
+    mkdir -p "$DEST/system/wine/custom"
+    tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$DEST/system/wine/custom" \
+        || fail "extraction du runner GE-Proton impossible"
+    [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ] \
+        || fail "runner GE-Proton extrait sans permissions d'exécution valides"
+    ok "Runner GE-Proton téléchargé et installé dans $WAL_RUNNER"
+fi
+
 NFILES="$(find "$SRC/system" -type f | wc -l)"
 ok "$NFILES fichiers prêts à installer"
 
@@ -89,6 +150,17 @@ mkdir -p "$DEST/system"
 cp -a "$SRC/system/." "$DEST/system/"
 ok "Fichiers copiés"
 
+WAL_DESKTOP="$DEST/system/tools/windows-arcade-loader.desktop"
+if [ -f "$WAL_DESKTOP" ]; then
+    mkdir -p /usr/share/applications
+    cp -f "$WAL_DESKTOP" /usr/share/applications/windows-arcade-loader.desktop \
+        || fail "copie du raccourci Windows Arcade Loader impossible"
+    chmod 644 /usr/share/applications/windows-arcade-loader.desktop
+    ok "Raccourci Windows Arcade Loader installé dans /usr/share/applications"
+else
+    warn "Raccourci introuvable : $WAL_DESKTOP"
+fi
+
 # Supprime uniquement les bibliothèques LinuxLoader qui ne sont plus dans
 # l'archive courante. Les autres fichiers utilisateur restent intacts.
 SRC_LL="$SRC/system/dcg/emulators/linuxloader"
@@ -110,7 +182,8 @@ step "Finalisation (fins de ligne, droits, dossiers)"
 for f in \
     "$DEST/system/dcg/configgen/dcglauncher" \
     "$DEST/system/configs/emulationstation/es_systems_teknoparrot.cfg" \
-    "$DEST/system/configs/emulationstation/es_features_linuxloader.cfg"; do
+    "$DEST/system/configs/emulationstation/es_features_linuxloader.cfg" \
+    "$DEST/system/configs/emulationstation/es_features_windowsarcadeloader.cfg"; do
     [ -f "$f" ] && sed -i 's/\r$//' "$f"
 done
 find "$DEST/system/dcg/configgen" -name '*.py' -exec sed -i 's/\r$//' {} + 2>/dev/null || true
@@ -123,6 +196,12 @@ chmod +x "$DEST/system/dcg/bin/batocera-wine-guns" 2>/dev/null || true
 LL="$DEST/system/dcg/emulators/linuxloader"
 if [ -d "$LL" ]; then
     chmod -R 755 "$LL"
+fi
+WAL="$DEST/system/dcg/emulators/windows-arcade-loader"
+if [ -d "$WAL" ]; then
+    for f in arcade-launcher arcade-launcher-gui; do
+        [ -f "$WAL/$f" ] && chmod +x "$WAL/$f"
+    done
 fi
 ok "Droits d'exécution appliqués"
 
@@ -195,9 +274,14 @@ for f in \
     system/dcg/configgen/dcglauncher \
     system/dcg/configgen/generators/linuxloader/linuxloaderGenerator.py \
     system/dcg/configgen/generators/wine/wineGenerator.py \
+    system/dcg/configgen/generators/windows-arcade-loader/windowsArcadeLoaderGenerator.py \
     system/dcg/emulators/linuxloader/linuxloader \
+    system/dcg/emulators/windows-arcade-loader/arcade-launcher \
+    system/dcg/emulators/windows-arcade-loader/launcher.yaml \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz \
     system/configs/emulationstation/es_systems_teknoparrot.cfg \
-    system/configs/emulationstation/es_features_linuxloader.cfg; do
+    system/configs/emulationstation/es_features_linuxloader.cfg \
+    system/configs/emulationstation/es_features_windowsarcadeloader.cfg; do
     if [ -e "$DEST/$f" ]; then
         ok "$f"
     else
@@ -205,6 +289,12 @@ for f in \
         missing=1
     fi
 done
+WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-7-x86_64"
+if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
+    ok "Runner GE-Proton11-7-x86_64 installé et exécutable"
+else
+    warn "Runner GE-Proton11-7-x86_64 absent ou non exécutable dans $WAL_RUNNER (décompressez l'archive originale en conservant les permissions)"
+fi
 sync
 
 # Installation réussie : la sauvegarde temporaire n'est plus utile
