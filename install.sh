@@ -90,12 +90,25 @@ SRC="$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 
 WAL_PREFIX="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
 INSTALLED_WAL_PREFIX="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
+WAL_PREFIX_EXPECTED_SIZE=""
+if head -n 1 "$WAL_PREFIX" | grep -qF 'version https://git-lfs.github.com/spec/v1'; then
+    WAL_PREFIX_EXPECTED_SIZE="$(awk '$1 == "size" { print $2; exit }' "$WAL_PREFIX")"
+fi
+USE_INSTALLED_WAL_PREFIX=0
 if [ -f "$INSTALLED_WAL_PREFIX" ] \
     && ! head -n 1 "$INSTALLED_WAL_PREFIX" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
     && gzip -t "$INSTALLED_WAL_PREFIX" >/dev/null 2>&1; then
+    if [ -z "$WAL_PREFIX_EXPECTED_SIZE" ] \
+        || [ "$(wc -c < "$INSTALLED_WAL_PREFIX" | tr -d '[:space:]')" = "$WAL_PREFIX_EXPECTED_SIZE" ]; then
+        USE_INSTALLED_WAL_PREFIX=1
+    else
+        ok "Taille du préfixe Wine différente de la version distante, téléchargement requis"
+    fi
+fi
+if [ "$USE_INSTALLED_WAL_PREFIX" = 1 ]; then
     cp -p "$INSTALLED_WAL_PREFIX" "$WAL_PREFIX" \
         || fail "réutilisation de l'archive du préfixe Wine installée impossible"
-    ok "Archive du préfixe Wine déjà installée, téléchargement ignoré"
+    ok "Archive du préfixe Wine à jour, téléchargement ignoré"
 else
     resolve_lfs_archive "$WAL_PREFIX" "$WAL_PREFIX_URL" "l'archive du préfixe Wine"
 fi
