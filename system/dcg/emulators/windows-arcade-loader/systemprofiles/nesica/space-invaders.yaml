@@ -1,0 +1,12 @@
+# Space Invaders (NESiCAxLive) - template, override values in
+# userprofiles/nesica/space-invaders.yaml.
+system: nesica
+name: Space Invaders
+
+# Direct3D 9 game (DXVK). No crypto key.
+
+# Button Shoot = b1 (default mapping).
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: Shoot

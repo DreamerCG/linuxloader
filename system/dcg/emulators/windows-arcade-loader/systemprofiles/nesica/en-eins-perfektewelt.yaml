@@ -1,0 +1,22 @@
+# EN-Eins Perfektewelt (NESiCAxLive) - template, override values in
+# userprofiles/nesica/en-eins-perfektewelt.yaml.
+system: nesica
+name: EN-Eins Perfektewelt
+
+# Rendered but nothing showed on screen with wine's dsound: native dsound/DirectMusic.
+tricks: [dmband, dmcompos, dmime, dmloader, dmscript, dmstyle, dmsynth, dmusic, dmusic32, dsound, dswave, dsdmo, gmdls]
+
+# Direct3D 9 game (DXVK). No crypto key.
+
+# Buttons 1-4 = b1-b4 (default mapping).
+
+env:
+  # The game wants 1280x768 fullscreen, not a mode Wine emulates: 1280x800, scaled to the screen.
+  WAL_D3D9_FULLSCREEN_SIZE: 1280x800
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: Button 1
+  b2: Button 2
+  b3: Button 3
+  b4: Button 4

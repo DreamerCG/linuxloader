@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Icon=/userdata/system/dcg/emulators/windows-arcade-loader/icon.png
+Exec=/userdata/system/dcg/emulators/windows-arcade-loader/arcade-launcher-gui
+Terminal=false
+Type=Application
+Categories=Game;batocera.linux;
+Name=Windows Arcade Loader

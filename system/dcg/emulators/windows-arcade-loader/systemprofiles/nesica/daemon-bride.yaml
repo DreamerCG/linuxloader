@@ -1,0 +1,19 @@
+# Daemon Bride: Additional Gain (NESiCAxLive) - template, override values in
+# userprofiles/nesica/daemon-bride.yaml.
+system: nesica
+name: 'Daemon Bride: Additional Gain'
+
+# Direct3D 9 game (DXVK).
+
+# Buttons 1-4 = b1-b4 (default mapping).
+
+env:
+  # encrypted data: crypto service with the BlazBlue Chrono Phantasma key
+  WAL_NESICA_KEY: bbcp
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: Button 1
+  b2: Button 2
+  b3: Button 3
+  b4: Button 4

@@ -1,0 +1,20 @@
+# Arcana Heart 3 Love Max Six Stars!!!!!! (NESiCAxLive) - template, override values in
+# userprofiles/nesica/arcana-heart-3-lmss.yaml.
+system: nesica
+name: Arcana Heart 3 Love Max Six Stars!!!!!!
+
+# Direct3D 9 game: through DXVK (default). No crypto key, no movies.
+
+# Buttons A B C D E: virtual top row b1-b4 = A B C D, b5 = E (FastIO Button6).
+native_map:
+  b5: btn6
+
+env:
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: A
+  b2: B
+  b3: C
+  b4: D
+  b5: E

@@ -1,0 +1,16 @@
+# Do Not Fall: Run for Your Drink (NESiCAxLive) - template, override values in
+# userprofiles/nesica/do-not-fall.yaml.
+system: nesica
+name: 'Do Not Fall: Run for Your Drink'
+
+# Direct3D 9 game (DXVK), FFmpeg movies.
+
+# Buttons A B C = b1-b3 (default mapping).
+
+env:
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: A
+  b2: B
+  b3: C

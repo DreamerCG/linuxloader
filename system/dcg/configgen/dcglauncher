@@ -25,6 +25,10 @@ from importlib import import_module
 CUSTOM_GENERATORS = {
     'wine-dcg': ('generators.wine.wineGenerator', 'WineGenerator'),
     'linuxloader-dcg': ('generators.linuxloader.linuxloaderGenerator', 'LinuxloaderGenerator'),
+    'windows-arcade-loader': (
+        'generators.windows-arcade-loader.windowsArcadeLoaderGenerator',
+        'WindowsArcadeLoaderGenerator',
+    ),
 }
 
 # Emulateurs geres par nos generateurs : on ne force pas -system windows pour eux.
@@ -42,8 +46,11 @@ DCG_WINE_SYSTEMS = {'teknoparrot'}
 NATIVE_GENERATORS = {
     'wine-dcg': ('generators.wine.wineGenerator', 'WineGenerator'),
     'linuxloader-dcg': ('generators.linuxloader.linuxloaderGenerator', 'LinuxloaderGenerator'),
+    'windows-arcade-loader': (
+        'generators.windows-arcade-loader.windowsArcadeLoaderGenerator',
+        'WindowsArcadeLoaderGenerator',
+    ),
 }
-
 
 # ---------------------------------------------------------------------------
 # Utilitaires

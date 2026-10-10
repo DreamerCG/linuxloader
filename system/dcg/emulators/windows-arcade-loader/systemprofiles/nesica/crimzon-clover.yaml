@@ -1,0 +1,32 @@
+# Crimzon Clover (NESiCAxLive) - template, override values in
+# userprofiles/nesica/crimzon-clover.yaml.
+system: nesica
+name: Crimzon Clover
+
+# DxLib game, Direct3D 9Ex loaded at run time. No crypto key.
+# DxLib sizes its window and sound buffers from the DirectSound caps: with wine's dsound it
+# computed a window ~5 million pixels high (X BadAlloc) and overran a mixing buffer (wine 9.22),
+# then showed only black. Native dsound (as Batocera's working prefix).
+tricks: [dsound]
+
+# Buttons Fire, Lock on, Bomb = b1-b3 (default mapping).
+
+env:
+  # The game asks NESYS for rankings and uses the parsed ranking object unchecked: with no
+  # ranking data it is NULL and the game crashes. Test the object instead of the success flag
+  # at the three call sites (test bl,bl -> test esi,esi).
+  WAL_PATCHES: "0x28597:85F6,0x285BC:85F6,0x285EF:85F6"
+  # The game creates a windowed 1280x768 device: fullscreen, 1280x800 (1280x768 is not a mode
+  # Wine emulates).
+  WAL_D3D9_FULLSCREEN: "1"
+  WAL_D3D9_FULLSCREEN_SIZE: 1280x800
+  # Its CreateFontA face names are Shift-JIS ("ＭＳ ゴシック", "FOT-キアロ Std B"): wine falls
+  # back to a host CJK font (Noto Sans CJK here) and the texts (boot warning, version) are far
+  # too big. Tuned by eye for that fallback font.
+  WAL_FONT_SCALE: "0.28"
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: Fire
+  b2: Lock On
+  b3: Bomb

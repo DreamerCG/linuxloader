@@ -1,0 +1,28 @@
+# The King of Fighters '98 Ultimate Match Final Edition (NESiCAxLive) - template, override
+# values in userprofiles/nesica/kof-98-umfe.yaml.
+system: nesica
+name: "The King of Fighters '98 Ultimate Match Final Edition"
+
+# Direct3D 9 game (DXVK). No crypto key.
+
+# Buttons A B C D: usual layout A=Button1 B=Button2 C=Button4 D=Button5 (2 rows of 3).
+# Virtual top row b1-b4 = A B C D.
+native_map:
+  b1: btn1
+  b2: btn2
+  b3: btn4
+  b4: btn5
+  b5: none
+  b6: none
+
+env:
+  # It polls a Direct3D event query into a 1-byte variable at the top of its stack frame; DXVK
+  # writes the whole 4-byte BOOL and overwrites the saved EBP: crash after the first frame.
+  WAL_D3D9_QUERY_FIX: "1"
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: A
+  b2: B
+  b3: C
+  b4: D

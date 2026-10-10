@@ -1,0 +1,28 @@
+# Raiden IV (NESiCAxLive) - template, override values in
+# userprofiles/nesica/raiden-4.yaml.
+system: nesica
+name: Raiden IV
+
+# Direct3D 9 game (DXVK). No crypto key.
+# d3d9.dll of the dump is ReShade (bezel): use DXVK.
+hide: [d3d9.dll]
+# MMShader.fx is HLSL source compiled at load: Wine's d3dx9_31 fails it and the game crashes
+# calling the missing effect (ID3DXEffect::SetVector on NULL).
+tricks: [d3dx9_31]
+
+# Buttons Shoot, Bomb = b1, b2 (default mapping).
+
+env:
+  # It converts its Shift-JIS movie name ("raiden4_ｃ50.m1v") with the ANSI code page: not
+  # found under a western one (white intro).
+  WAL_ANSI_CODEPAGE: "932"
+
+# The intro movie is an MPEG-1 elementary stream whose only sequence header is at the start of
+# the file: Wine's DirectShow MPEG decoder needs the one of the media type (GE-Proton patch
+# ge-video-rework/0077, after GE-Proton11-7); without it, black picture with audio only, then a
+# hang ~10 s in.
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: Shoot
+  b2: Bomb

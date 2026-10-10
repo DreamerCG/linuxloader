@@ -1,0 +1,15 @@
+# Trouble Witches AC: Amalgam no Joutachi (NESiCAxLive) - template, override values in
+# userprofiles/nesica/trouble-witches-ac.yaml.
+system: nesica
+name: 'Trouble Witches AC: Amalgam no Joutachi'
+
+# Rainlily/Selene engine. No crypto key.
+
+# Buttons 1-4 = b1-b4 (default mapping).
+
+# Control names (the GUI's mapping rows).
+controls:
+  b1: Button 1
+  b2: Button 2
+  b3: Button 3
+  b4: Button 4

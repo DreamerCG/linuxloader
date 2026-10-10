@@ -1,0 +1,49 @@
+# Far Cry Paradise Lost (Global VR) - template, override values in
+# userprofiles/globalvr/farcry-paradise-lost.yaml.
+system: globalvr
+name: Far Cry Paradise Lost
+
+# CryEngine 1, Direct3D 9 (DXVK). The USBIO board (USBIOExtreme.dll) is replaced by the
+# payload: both guns, panel buttons and coins.
+
+# With wine's builtin DirectSound the game computes a window ~5.4 million pixels high (as
+# Crimzon Clover) and nothing shows, and there is no sound: native dsound.
+tricks: [dsound]
+
+env:
+  # The game wants to run from W: (the cabinet's RunMe.bat does `subst W: .`) and stops on a
+  # "You are not running under W drive!" message box otherwise: the payload redirects its
+  # w:\ paths, skip the _getdrive() check (je -> jmp).
+  # The payload answers the HASP4 dongle (game PARLST 1.0), but with it present the boot and
+  # level-start dongle checks still show "IncorrectDongle": skip them (jne -> jmp at 0x5cbc57,
+  # 0x5cbc68 and 0x5ceef0, je -> nop at 0x5cc4af).
+  # The PC mouse is FPS mouse look in levels: its update is removed from the input manager
+  # (0x7af9a1, the guns are updated there too). The game reads the USBIO board's version over
+  # HID and raises arcade error 0x400 ("n/a"): je -> nop at 0x7af4b6.
+  WAL_PATCHES: "0x1C89:EB,0x1CBC57:EB,0x1CBC68:EB,0x1CC4AF:9090,0x1CEEF0:EB,0x3AF9A1:909090909090909090909090909090909090,0x3AF4B6:9090"
+  # systemcfg.lua asks a 1920x1080 window (r_Fullscreen = "0"): fullscreen device instead.
+  WAL_D3D9_FULLSCREEN: "1"
+
+input:
+  # lightguns first, then mice
+  guns_enabled: true
+  # the gun position must not press the d-pad
+  stick_as_dpad: false
+  # The game's own keyboard (operator keys, plus the console game's controls and debug keys)
+  # only sees the virtual sticks' operator buttons (payload keyboard.rs): default keys, F2
+  # test (open / select), 9 service, arrows up / down in the test menu.
+
+# Gun axes are sent as 1..255: calibration for that range (the dump's was made for its
+# DirectInput setup, 0..2000). The game rewrites it when calibrating from the test menu.
+files:
+  arcade_calibration.txt: systemprofiles/globalvr/files/farcry-paradise-lost/arcade_calibration.txt
+
+# Control names (the GUI's mapping rows).
+controls:
+  up: none
+  down: none
+  left: none
+  right: none
+  b1: Trigger
+  b2: Grenade
+  b3: Action
