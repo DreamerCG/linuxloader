@@ -90,7 +90,14 @@ SRC="$(find "$WORK" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 
 WAL_PREFIX="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
 INSTALLED_WAL_PREFIX="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
+WAL_PREFIX_VERSION="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.version"
+INSTALLED_WAL_PREFIX_VERSION="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.version"
 WAL_PREFIX_EXPECTED_SIZE=""
+WAL_PREFIX_EXPECTED_VERSION=""
+if [ -f "$WAL_PREFIX_VERSION" ]; then
+    WAL_PREFIX_EXPECTED_VERSION="$(tr -d '\r\n' < "$WAL_PREFIX_VERSION")"
+    [ -n "$WAL_PREFIX_EXPECTED_VERSION" ] || fail "fichier de version du préfixe Wine vide"
+fi
 if head -n 1 "$WAL_PREFIX" | grep -qF 'version https://git-lfs.github.com/spec/v1'; then
     WAL_PREFIX_EXPECTED_SIZE="$(awk '$1 == "size" { print $2; exit }' "$WAL_PREFIX")"
 fi
@@ -98,7 +105,14 @@ USE_INSTALLED_WAL_PREFIX=0
 if [ -f "$INSTALLED_WAL_PREFIX" ] \
     && ! head -n 1 "$INSTALLED_WAL_PREFIX" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
     && gzip -t "$INSTALLED_WAL_PREFIX" >/dev/null 2>&1; then
-    if [ -z "$WAL_PREFIX_EXPECTED_SIZE" ] \
+    if [ -n "$WAL_PREFIX_EXPECTED_VERSION" ]; then
+        if [ -f "$INSTALLED_WAL_PREFIX_VERSION" ] \
+            && [ "$(tr -d '\r\n' < "$INSTALLED_WAL_PREFIX_VERSION")" = "$WAL_PREFIX_EXPECTED_VERSION" ]; then
+            USE_INSTALLED_WAL_PREFIX=1
+        else
+            ok "Version du préfixe Wine différente ou absente, téléchargement requis"
+        fi
+    elif [ -z "$WAL_PREFIX_EXPECTED_SIZE" ] \
         || [ "$(wc -c < "$INSTALLED_WAL_PREFIX" | tr -d '[:space:]')" = "$WAL_PREFIX_EXPECTED_SIZE" ]; then
         USE_INSTALLED_WAL_PREFIX=1
     else
@@ -176,6 +190,13 @@ fi
 step "Copie des fichiers vers $DEST/system"
 mkdir -p "$DEST/system"
 cp -a "$SRC/system/." "$DEST/system/"
+# Copie aussi explicitement la version du préfixe, utilisée au prochain démarrage
+# de l'installateur pour décider si l'archive déjà installée peut être réutilisée.
+if [ -f "$WAL_PREFIX_VERSION" ]; then
+    mkdir -p "$(dirname "$INSTALLED_WAL_PREFIX_VERSION")"
+    cp -f "$WAL_PREFIX_VERSION" "$INSTALLED_WAL_PREFIX_VERSION" \
+        || fail "copie de la version du préfixe Wine impossible"
+fi
 ok "Fichiers copiés"
 
 WAL_DESKTOP="$DEST/system/tools/windows-arcade-loader.desktop"
