@@ -33,13 +33,16 @@ _logger = logging.getLogger(__name__)
 # kept in /userdata/saves/<system>/<rom name> (logs, settings, calibration).
 #
 # Controls are set per game kind, from the rom name: gun games (default),
-# driving (Cruis'n Blast), joystick (Galaga Assault, Pac-Man Chomp
-# Mania, Pink Panther Jewel Heist) and Wheel of Fortune's spinner (wof). On every pad, Start starts, Select
-# inserts a coin, R3 is the test switch and L3 service.
+# driving (Cruis'n Blast), joystick (Galaga Assault, Pac-Man Chomp Mania,
+# World's Largest Pac-Man, Pink Panther Jewel Heist) and Wheel of Fortune's
+# spinner (wof). On every pad, Start starts, Select inserts a coin, R3 is the
+# test switch and L3 service.
 #
 # Angry Birds Arcade is a gun game here: its cabinet fires balls with a
 # slingshot at a touch frame, which linuxloader answers with P1's gun (or a
 # mouse), each pull of the trigger a hit where it aims.
+# Space Invaders Frenzy is a two-player gun game; classify it explicitly so
+# its Sinden border and gun devices are included in the generated config.
 #
 # Driving: a wheel or a pad steers the same way (left stick or wheel, R2 gas,
 # L2 brake); the device steering also gets the game's force feedback, a
@@ -90,6 +93,15 @@ _logger = logging.getLogger(__name__)
 # unity/ and FMOD 1.10's Linux libraries in fnfmega_Data/Plugins/x86_64, see
 # linuxloader's docs/superbikes3.md). It rides as the driving games (left
 # stick or wheel leans, R2 throttle, L2 or y brake, b view, a music).
+#
+# Ghostbusters Arcade is a two-player gun game. Its game, g6/, utils/ and
+# hasp/ can sit directly in the rom directory; /pm is redirected there.
+# Guns and mice aim normally; a pad's left stick aims, b fires, a reloads
+# and y is the third gun button. Up/down navigate the operator menus.
+#
+# World's Largest Pac-Man is a joystick title: no gun inputs are mapped, and
+# the d-pad or left stick controls its four directions.
+# TMNT has four independent joystick players and Page Up/Page Down volume.
 
 LINUXLOADER_DIR: Final = Path('/userdata/system/dcg/emulators/linuxloader')
 LINUXLOADER_CONFIG: Final = CONFIGS / 'linuxloader'
@@ -200,6 +212,20 @@ _PAD_DHRIDERS: Final = {
 # Joystick: b (bottom face button) starts and fires.
 _PAD_JOYSTICK: Final = {'b': 'BUTTON_1'}
 
+_PAD_TMNT: Final = {
+    'a': 'BUTTON_1',
+    'b': 'BUTTON_2',
+    'x': 'BUTTON_3',
+}
+
+_PAD_GHOSTBUSTERS: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_2',
+    'y': 'BUTTON_3',
+    'up': 'BUTTON_UP',
+    'down': 'BUTTON_DOWN',
+}
+
 # Wheel of Fortune: the left stick turns the spinner (ANALOGUE_3, as fast
 # as it is pushed), the d-pad's left/right too, slowly, to move through the
 # menus, and its up/down are the volume; b and a are the PUSH button, as Start is. A
@@ -243,9 +269,9 @@ def _detect_batocera_version() -> int | None:
 
 def _pointers(guns, /) -> list[tuple[str, str, set[int]]]:
     """Mice and touchpads, by event number: (node, axis type (REL for a
-    mouse, ABS for a touchpad), button codes); not the guns, nor anything on
-    a gun's device, nor virtual devices (a streaming server's, Sunshine's...:
-    Bluetooth pads are under /devices/virtual/misc/uhid instead)."""
+    mouse, ABS for a touchpad), button codes). Physical pointers precede
+    streaming mice. Exclude guns, their companion devices, virtual keyboard
+    aggregators and touchscreen/tablet devices."""
     import evdev
     import pyudev
 
@@ -259,7 +285,7 @@ def _pointers(guns, /) -> list[tuple[str, str, set[int]]]:
             pass
     gun_paths.discard(None)
 
-    found: list[tuple[int, str, str, set[int]]] = []
+    found: list[tuple[bool, int, str, str, set[int]]] = []
     for dev in context.list_devices(subsystem='input'):
         node = dev.device_node
         match = _EVENT_RE.match(node) if node else None
@@ -268,7 +294,11 @@ def _pointers(guns, /) -> list[tuple[str, str, set[int]]]:
             continue
         if props.get('ID_INPUT_MOUSE') != '1' and props.get('ID_INPUT_TOUCHPAD') != '1':
             continue
-        if props.get('ID_PATH') in gun_paths or (props.get('DEVPATH') or '').startswith('/devices/virtual/input/'):
+        if props.get('ID_PATH') in gun_paths:
+            continue
+        virtual = (props.get('DEVPATH') or '').startswith('/devices/virtual/input/')
+        if virtual and any(props.get(prop) == '1' for prop in
+                           ('ID_INPUT_KEYBOARD', 'ID_INPUT_TOUCHSCREEN', 'ID_INPUT_TABLET')):
             continue
         try:
             caps = evdev.InputDevice(node).capabilities()
@@ -282,8 +312,8 @@ def _pointers(guns, /) -> list[tuple[str, str, set[int]]]:
             axis = 'ABS'
         else:
             continue
-        found.append((int(match.group(1)), node, axis, set(caps.get(ecodes.EV_KEY, []))))
-    return [(node, axis, keys) for _, node, axis, keys in sorted(found)]
+        found.append((virtual, int(match.group(1)), node, axis, set(caps.get(ecodes.EV_KEY, []))))
+    return [(node, axis, keys) for _, _, node, axis, keys in sorted(found)]
 
 
 def _fix_pt2_sound_daemon(game_dir: Path, /) -> None:
@@ -313,8 +343,17 @@ def _is_nerf(rom: Path, /) -> bool:
 
 def _game_kind(rom: Path, /) -> str:
     name = rom.name.lower()
+    flat = re.sub(r'[^a-z]', '', name)
     if 'halo' in name:
         return 'halo'
+    if 'teenage mutant ninja turtles' in name or 'tmnt' in name:
+        return 'tmnt'
+    if 'ghostbusters' in re.sub(r'[^a-z]', '', name):
+        return 'ghostbusters'
+    if 'spaceinvadersfrenzy' in flat:
+        return 'gun'
+    if 'worldslargestpacman' in flat:
+        return 'joystick'
     if 'centipede' in name:
         return 'centipede'
     if 'cruis' in name:
@@ -331,7 +370,6 @@ def _game_kind(rom: Path, /) -> str:
         return 'driving'
     if 'nirin' in name:
         return 'bike'
-    flat = re.sub(r'[^a-z]', '', name)
     if 'deadheatriders' in flat or 'dhriders' in flat:
         return 'dhriders'
     # Maximum Heat 3D is Dead Heat's later build: the same cabinet and controls.
@@ -420,6 +458,11 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             return
         for name, action in (_WHEEL_DRIVING if wheel else _PAD_DRIVING).items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'ghostbusters':
+        _set(evdev, f'ANALOGUE_{nplayer * 2 - 1}', _pad_input(pad, 'joystick1left', digital=False))
+        _set(evdev, f'ANALOGUE_{nplayer * 2}', _pad_input(pad, 'joystick1up', digital=False))
+        for name, action in _PAD_GHOSTBUSTERS.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == 'wof':
         if nplayer != 1:
             return
@@ -433,6 +476,15 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         for direction in _DIRECTIONS:
             sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
             _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
+    elif kind == 'tmnt':
+        for name, action in _PAD_TMNT.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+        for direction in _DIRECTIONS:
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
+        if nplayer == 1:
+            _set(evdev, 'VOLUME_UP', _pad_input(pad, 'pageup', digital=True))
+            _set(evdev, 'VOLUME_DOWN', _pad_input(pad, 'pagedown', digital=True))
 
 
 class LinuxloaderGenerator(Generator):
@@ -481,7 +533,8 @@ class LinuxloaderGenerator(Generator):
             'EVDEV': {},
         }
         evdev = conf['EVDEV']
-        if _is_nerf(rom):
+        # Big Buck Pro uses a GLUT window in place of its cabinet game mode.
+        if _is_nerf(rom) or 'bigbuckhunterpro' in re.sub(r'[^a-z]', '', rom.name.lower()):
             conf['Display']['FULLSCREEN'] = '1'
 
         # DEBUG: état de départ
@@ -496,9 +549,9 @@ class LinuxloaderGenerator(Generator):
         # Guns (gun games): P1 on ANALOGUE_1/2, P2 on ANALOGUE_3/4, and so on;
         # then mice and touchpads for the players left, in their order.
         # Halo runs as its 4 player cabinet; the other games have 2 players.
-        max_players = 4 if kind == 'halo' else 2
+        max_players = 4 if kind in ('halo', 'tmnt') else 2
         gun_players = 0
-        if kind in ('gun', 'halo') and system.config.use_guns and guns:
+        if kind in ('gun', 'halo', 'ghostbusters') and system.config.use_guns and guns:
             if any(gun.needs_borders for gun in guns):
                 inner, outer = bezelsUtil.gunBordersSize(system.guns_borders_size_name(guns))
                 conf['Display']['BORDER_ENABLED'] = 'true'
@@ -521,7 +574,7 @@ class LinuxloaderGenerator(Generator):
                         evdev[key] = f'{gun.node}:KEY:{code}'
                 gun_players = nplayer
 
-        if kind in ('gun', 'halo', 'wof'):
+        if kind in ('gun', 'halo', 'ghostbusters', 'wof'):
             pointers = _pointers(guns if system.config.use_guns and guns else [])
             # Wheel of Fortune: one mouse spins (its moves, ANALOGUE_1); its
             # buttons leave the pad's to PUSH, and a touchpad (a position, not
@@ -559,7 +612,7 @@ class LinuxloaderGenerator(Generator):
         config_file.write_text('\n'.join(lines))
         _logger.debug('linuxloader config (%s) %s:\n%s', kind, config_file, '\n'.join(lines))
 
-        # Games kept in the cabinet's layout (Pink Panther Jewel Heist) have
+        # Games kept in the cabinet's layout (Pink Panther, Ghostbusters) have
         # the binary, its hasp/ and bezel.png in pm/, the cabinet's /pm.
         if not (game_dir / 'game').is_file() and (game_dir / 'pm' / 'game').is_file():
             game_dir = game_dir / 'pm'
@@ -576,23 +629,29 @@ class LinuxloaderGenerator(Generator):
         print("Batocera Version :", version, file=sys.stderr)
         print("Debug command :", command, file=sys.stderr)        
 
-        # Chemins de base communs à toutes les versions
-        ld_library_path = (
-            f'/lib32/pulseaudio:/lib32:/lib32/extralibs:/lib:/usr/lib:{LINUXLOADER_DIR}'
-        )
+        library_dirs = ['/lib32/pulseaudio', '/lib32', '/lib32/extralibs', str(game_dir / 'lib')]
+        if kind == 'ghostbusters':
+            # The ELF links ESD but imports none of its symbols. Its empty
+            # compatibility library must only be offered to this game.
+            library_dirs.append(str(LINUXLOADER_DIR / 'ghostbusters'))
 
         # Libs supplémentaires uniquement pour Batocera 42
         if version == 42:
-            ld_library_path += f':{LINUXLOADER_DIR}/lib'
-            print("Chargement des libs supplementaires pour Batocera 42", ld_library_path, file=sys.stderr)
+            library_dirs.append(str(LINUXLOADER_DIR / 'lib'))           
 
+        library_dirs.extend(['/lib', '/usr/lib', str(LINUXLOADER_DIR)])
+        print("Chargement des libs : ", library_dirs, file=sys.stderr)
+
+        os.chdir(LINUXLOADER_DIR)
         return Command.Command(
             array=command,
             env={
                 # /lib32/libpulsecommon-17.0.so links to the 64-bit library:
                 # the 32-bit one is in /lib32/pulseaudio (The Walking Dead
                 # links libpulse).
-                'LD_LIBRARY_PATH': ld_library_path,
+                # Per-game dependencies (e.g. Ghostbusters' libcsv/libesd)
+                # live in lib/ beside game, for flat and cabinet layouts.
+                'LD_LIBRARY_PATH': ':'.join(library_dirs),
                 'LIBGL_DRIVERS_PATH': '/lib32/dri:/usr/lib/dri',
                 'SPA_PLUGIN_DIR': '/lib32/spa-0.2:/usr/lib/spa-0.2',
                 'PIPEWIRE_MODULE_DIR': '/lib32/pipewire-0.3:/usr/lib/pipewire-0.3',
