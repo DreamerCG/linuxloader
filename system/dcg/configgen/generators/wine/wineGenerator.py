@@ -38,6 +38,18 @@ PLAYER_MAPPING = [
     {"BTN_MIDDLE": "KEY_4", "BTN_1": "KEY_8"},   # P4: Start=4, Coin=8
 ]
 
+# Per-game overrides keyed by a case-insensitive substring of the ROM filename.
+GAME_PLAYER_MAPPING = {
+    "target bravo": {
+        0: {"BTN_MIDDLE": "KEY_ENTER"},
+        1: {"BTN_MIDDLE": "KEY_MINUS"},
+    },
+    "targert bravo": {
+        0: {"BTN_MIDDLE": "KEY_ENTER"},
+        1: {"BTN_MIDDLE": "KEY_MINUS"},
+    },
+}
+
 SHARED_MAPPING = {
     "BTN_2":  None,
     "BTN_3":  None,
@@ -116,7 +128,7 @@ def _detect_demulshooter(rom_path):
 
     return None
 
-def _build_player_mapping(player_index, metadata):
+def _build_player_mapping(player_index, metadata, rom_path):
     #Build the full mapping for one player
     mapping = dict(SHARED_MAPPING)
 
@@ -124,6 +136,12 @@ def _build_player_mapping(player_index, metadata):
         mapping.update(PLAYER_MAPPING[player_index])
     else:
         mapping.update(PLAYER_MAPPING[0])
+
+    rom_name = os.path.basename(str(rom_path)).casefold()
+    for game_name, overrides in GAME_PLAYER_MAPPING.items():
+        if game_name in rom_name:
+            mapping.update(overrides.get(player_index, {}))
+            break
 
     if metadata:
         for btn_name in list(mapping.keys()):
@@ -232,7 +250,7 @@ class WineGenerator(Generator):
 
         gun_configs = []
         for i in range(num_guns):
-            mapping = _build_player_mapping(i, metadata)
+            mapping = _build_player_mapping(i, metadata, rom)
             gun_configs.append({"player": i + 1, "mapping": mapping})
             eslog.error("Wine gun P%d: %s", i + 1,
                        ", ".join("{}->{}".format(k, v) for k, v in mapping.items()))
