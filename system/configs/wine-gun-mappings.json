@@ -1,0 +1,8 @@
+{
+  "target bravo": {
+    "BTN_MIDDLE": {
+      "1": "KEY_ENTER",
+      "2": "KEY_MINUS"
+    }
+  }
+}

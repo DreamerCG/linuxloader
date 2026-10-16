@@ -38,18 +38,6 @@ PLAYER_MAPPING = [
     {"BTN_MIDDLE": "KEY_4", "BTN_1": "KEY_8"},   # P4: Start=4, Coin=8
 ]
 
-# Per-game overrides keyed by a case-insensitive substring of the ROM filename.
-GAME_PLAYER_MAPPING = {
-    "target bravo": {
-        0: {"BTN_MIDDLE": "KEY_ENTER"},
-        1: {"BTN_MIDDLE": "KEY_MINUS"},
-    },
-    "targert bravo": {
-        0: {"BTN_MIDDLE": "KEY_ENTER"},
-        1: {"BTN_MIDDLE": "KEY_MINUS"},
-    },
-}
-
 SHARED_MAPPING = {
     "BTN_2":  None,
     "BTN_3":  None,
@@ -61,6 +49,7 @@ SHARED_MAPPING = {
 }
 
 GUN_CONFIG_PATH = "/var/run/wine-guns.json"
+GAME_MAPPING_CONFIG_PATH = Path("/userdata/system/dcg/configs/wine-gun-mappings.json")
 
 # ─── DemulShooter game detection ───────────────────────────
 #
@@ -128,7 +117,56 @@ def _detect_demulshooter(rom_path):
 
     return None
 
-def _build_player_mapping(player_index, metadata, rom_path):
+def _load_game_player_mapping():
+    try:
+        with GAME_MAPPING_CONFIG_PATH.open(encoding="utf-8") as mapping_file:
+            raw_mapping = json.load(mapping_file)
+    except FileNotFoundError:
+        eslog.info("Wine gun: no custom mapping file found at %s", GAME_MAPPING_CONFIG_PATH)
+        return {}
+    except (OSError, json.JSONDecodeError) as e:
+        eslog.error("Wine gun: failed to load custom mappings from %s: %s",
+                    GAME_MAPPING_CONFIG_PATH, e)
+        raise
+
+    if not isinstance(raw_mapping, dict):
+        raise ValueError("Wine gun mapping file must contain a JSON object")
+
+    game_mapping = {}
+    for game_name, button_mappings in raw_mapping.items():
+        if not isinstance(game_name, str) or not game_name.strip():
+            raise ValueError("Wine gun mapping game names must be non-empty strings")
+        if not isinstance(button_mappings, dict):
+            raise ValueError("Wine gun mapping for {!r} must be a JSON object".format(game_name))
+
+        player_mappings = {}
+        for button_name, players in button_mappings.items():
+            if not isinstance(button_name, str) or not isinstance(players, dict):
+                raise ValueError(
+                    "Wine gun mapping for {!r} must map button names to player objects".format(game_name)
+                )
+
+            for player, key_name in players.items():
+                try:
+                    player_number = int(player)
+                except (TypeError, ValueError) as e:
+                    raise ValueError(
+                        "Wine gun mapping player IDs must be positive numbers"
+                    ) from e
+                if player_number < 1:
+                    raise ValueError("Wine gun mapping player IDs must be positive numbers")
+                if key_name is not None and not isinstance(key_name, str):
+                    raise ValueError(
+                        "Wine gun mapping values must be key names or null"
+                    )
+                player_mappings.setdefault(player_number - 1, {})[button_name] = key_name
+
+        game_mapping[game_name.casefold()] = player_mappings
+
+    return game_mapping
+
+
+def _build_player_mapping(player_index, metadata, rom_path, game_player_mapping):
     #Build the full mapping for one player
     mapping = dict(SHARED_MAPPING)
 
@@ -138,10 +176,13 @@ def _build_player_mapping(player_index, metadata, rom_path):
         mapping.update(PLAYER_MAPPING[0])
 
     rom_name = os.path.basename(str(rom_path)).casefold()
-    for game_name, overrides in GAME_PLAYER_MAPPING.items():
-        if game_name in rom_name:
-            mapping.update(overrides.get(player_index, {}))
-            break
+    matching_games = [name for name in game_player_mapping if name in rom_name]
+    if matching_games:
+        game_name = max(matching_games, key=len)
+        overrides = game_player_mapping[game_name].get(player_index, {})
+        mapping.update(overrides)
+        eslog.info("Wine gun P%d: custom mapping for %s: %s",
+                   player_index + 1, game_name, overrides)
 
     if metadata:
         for btn_name in list(mapping.keys()):
@@ -248,9 +289,10 @@ class WineGenerator(Generator):
         num_guns = len(guns)
         eslog.error("Wine: %d light gun(s) detected", num_guns)
 
+        game_player_mapping = _load_game_player_mapping()
         gun_configs = []
         for i in range(num_guns):
-            mapping = _build_player_mapping(i, metadata, rom)
+            mapping = _build_player_mapping(i, metadata, rom, game_player_mapping)
             gun_configs.append({"player": i + 1, "mapping": mapping})
             eslog.error("Wine gun P%d: %s", i + 1,
                        ", ".join("{}->{}".format(k, v) for k, v in mapping.items()))
