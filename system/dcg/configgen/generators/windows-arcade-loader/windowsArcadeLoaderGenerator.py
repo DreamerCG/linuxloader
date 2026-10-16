@@ -48,7 +48,7 @@ WAL_DIR: Final = Path('/userdata/system/dcg/emulators/windows-arcade-loader')
 WAL_CONFIG: Final = CONFIGS / 'windows-arcade-loader'
 
 print(f" ===================================", file=sys.stderr)
-print(f" Lancement de Wine Generator :", file=sys.stderr)
+print(f" Lancement de Windows Arcade Loader Generator :", file=sys.stderr)
 print(f" WAL DIR : {WAL_DIR}", file=sys.stderr)
 print(f" WAL_CONFIG : {WAL_CONFIG}", file=sys.stderr)
 print(f" ===================================", file=sys.stderr)
