@@ -630,6 +630,7 @@ class LinuxloaderGenerator(Generator):
         print("Debug command :", command, file=sys.stderr)        
 
         library_dirs = ['/lib32/pulseaudio', '/lib32', '/lib32/extralibs', str(game_dir / 'lib')]
+        
         if kind == 'ghostbusters':
             # The ELF links ESD but imports none of its symbols. Its empty
             # compatibility library must only be offered to this game.
@@ -640,6 +641,7 @@ class LinuxloaderGenerator(Generator):
             library_dirs.append(str(LINUXLOADER_DIR / 'lib'))           
 
         library_dirs.extend(['/lib', '/usr/lib', str(LINUXLOADER_DIR)])
+        
         print("Chargement des libs : ", library_dirs, file=sys.stderr)
 
         os.chdir(LINUXLOADER_DIR)

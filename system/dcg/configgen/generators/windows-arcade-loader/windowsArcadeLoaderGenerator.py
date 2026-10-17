@@ -8,8 +8,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from configgen import Command
-from configgen.batoceraPaths import CONFIGS, mkdir_if_not_exists
-from configgen.controller import generate_sdl_game_controller_config
+from configgen.batoceraPaths import BATOCERA_ES_DIR, CONFIGS, USER_ES_DIR, configure_emulator, mkdir_if_not_exists
+from configgen.controller import Controller, generate_sdl_game_controller_config
+from configgen.input import Input
 from configgen.generators.Generator import Generator
 # from configgen.utils.gamescope import gamescope_args
 
@@ -43,6 +44,10 @@ _logger = logging.getLogger(__name__)
 #   arcade-launcher, payloads/ (wal_*.dll, wal-loader.exe), systemprofiles/,
 #   launcher.yaml (machine settings: runners_dir, payloads_dir), wine-prefix/ (created)
 # The Wine runner (GE-Proton with the loader's hotfixes) is in /userdata/system/wine/custom.
+#
+# The GUI (applications menu, arcade-launcher-gui) comes through here too, with the rom
+# "config": SDL then gets the pads' ES mappings as in games (without them, pads SDL3 does not
+# know, e.g. Xbox ones without HIDAPI, are plain joysticks).
 
 WAL_DIR: Final = Path('/userdata/system/dcg/emulators/windows-arcade-loader')
 WAL_CONFIG: Final = CONFIGS / 'windows-arcade-loader'
@@ -55,6 +60,27 @@ print(f" ===================================", file=sys.stderr)
 
 
 _GAMESCOPE_SWITCHES: Final = {'gamescope_hdr', 'gamescope_hdr_itm_enabled'}
+
+
+def _es_pads() -> list[Controller]:
+    # outside a game ES passes no -pX controllers: every pad configured in ES (user file first)
+    import xml.etree.ElementTree as ET
+
+    pads: dict[str, Controller] = {}
+    for conffile in (USER_ES_DIR / 'es_input.cfg', BATOCERA_ES_DIR / 'es_input.cfg'):
+        if not conffile.exists():
+            continue
+        for element in ET.parse(conffile).getroot().iterfind('./inputConfig[@type="joystick"]'):
+            guid = element.get('deviceGUID') or ''
+            name = element.get('deviceName') or ''
+            if not guid or guid in pads:
+                continue
+            pads[guid] = Controller(
+                name=name, type='joystick', guid=guid, player_number=len(pads) + 1, index=len(pads),
+                real_name=name, device_path='', button_count=0, hat_count=0, axis_count=0,
+                inputs_=Input.from_parent_element(element),
+            )
+    return list(pads.values())
 
 
 def _yaml_scalar(value: str | bool) -> str:
@@ -76,6 +102,16 @@ class WindowsArcadeLoaderGenerator(Generator):
         return True
 
     def generate(self, system, rom, playersControllers, metadata, guns, wheels, gameResolution):
+        if configure_emulator(rom):
+            os.chdir(WAL_DIR)
+            return Command.Command(
+                array=[str(WAL_DIR / 'arcade-launcher'), 'gui', '--root', str(WAL_DIR)],
+                env={
+                    'SDL_GAMECONTROLLERCONFIG': generate_sdl_game_controller_config(playersControllers or _es_pads()),
+                    'SDL_JOYSTICK_HIDAPI': '0',
+                },
+            )
+
         mkdir_if_not_exists(WAL_CONFIG)
 
         # ES options -> profile keys (top level or under input:), set ones only.
