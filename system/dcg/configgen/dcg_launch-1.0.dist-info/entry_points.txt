@@ -1,0 +1,4 @@
+[batocera_launch.emulators]
+windows-arcade-loader = dcg_launch.windows_arcade_loader:WindowsArcadeLoader
+linuxloader-dcg = dcg_launch.linuxloader:LinuxLoader
+wine-dcg = dcg_launch.wine:Wine
