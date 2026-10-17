@@ -24,9 +24,9 @@ _logger = logging.getLogger(__name__)
 #
 # The rom is a game dump directory holding <gameid>.windowsloader (the executable path
 # relative to the dump root): ES lists that file, the game id selects the profile. Or the
-# dump packed as a .squashfs image: configgen mounts it and hands the mounted directory;
-# writesToRom() gives it a writable overlay kept in /userdata/saves/<system>/<image name>
-# (the game's save data in the dump's WindowsLoader folder).
+# dump packed as a .squashfs image: Batocera Launch mounts it and hands the mounted
+# directory; needs_overlayfs() gives it a writable overlay kept in
+# /userdata/saves/<system>/<image name> (the game's save data in the dump's WindowsLoader folder).
 #
 # The ES options are written as an extra profile layer (--profile), merged over the game's
 # profile: only the options set in ES, so a game's own setting (e.g. KOF Maximum Impact
@@ -99,6 +99,9 @@ class WindowsArcadeLoader(Emulator):
     @property
     def execution_path(self) -> Path:
         return WAL_DIR
+
+    def needs_overlayfs(self, _rom: Path, /) -> bool:
+        return True
 
     async def configure(self) -> Command:
         if configure_emulator(self.rom):
