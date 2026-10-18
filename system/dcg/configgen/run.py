@@ -34,10 +34,10 @@ def run_batocera_launch() -> None:
         emulator = "linuxloader-dcg"
         sys.argv[sys.argv.index("-emulator") + 1] = emulator
         print("[DCG LAUNCHER] Redirection linuxloader -> linuxloader-dcg", file=sys.stderr)
-    elif emulator == "wine" and system == "teknoparrot":
+    elif emulator == "wine" and system in {"teknoparrot", "windows_squash"}:
         emulator = "wine-dcg"
         sys.argv[sys.argv.index("-emulator") + 1] = emulator
-        print("[DCG LAUNCHER] Redirection wine -> wine-dcg pour teknoparrot", file=sys.stderr)
+        print(f"[DCG LAUNCHER] Redirection wine -> wine-dcg pour {system}", file=sys.stderr)
     matching_emulators = sorted(
         f"{entry_point.name}={entry_point.value}"
         for entry_point in entry_points(group="batocera_launch.emulators")
