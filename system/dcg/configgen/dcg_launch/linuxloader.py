@@ -287,6 +287,9 @@ class LinuxLoader(Emulator):
     def handles_bezels(self) -> bool:
         return True
 
+    def needs_overlayfs(self, _rom: Path, /) -> bool:
+        return True
+
     @cached_property
     def in_game_ratio(self) -> float:
         return 16 / 9
