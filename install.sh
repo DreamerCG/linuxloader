@@ -9,7 +9,7 @@ set -e
 
 REPO_URL="${ARCHIVE_URL:-https://github.com/DreamerCG/linuxloader/archive/refs/heads/main.tar.gz}"
 WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz}"
-WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-10/GE-Proton11-10-x86_64.tar.gz}"
+WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/GE-Proton11-10-x86_64.tar.gz}"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
 WORK="$DEST/system/.dcg_install_tmp"
@@ -127,13 +127,13 @@ else
     resolve_lfs_archive "$WAL_PREFIX" "$WAL_PREFIX_URL" "l'archive du préfixe Wine"
 fi
 
-# Le runner vient directement de la release officielle. L'extraction avec tar
-# préserve les permissions d'exécution nécessaires aux binaires Wine.
-WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-7-x86_64"
+# Le runner GE-Proton 11-10 est stocké dans le dépôt Git LFS. L'extraction avec
+# tar préserve les permissions d'exécution nécessaires aux binaires Wine.
+WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-10-x86_64"
 if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
     ok "Runner GE-Proton déjà installé, téléchargement ignoré"
 else
-    WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-7-x86_64.tar.gz"
+    WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-10-x86_64.tar.gz"
     if command -v curl >/dev/null 2>&1; then
         curl -fsL --retry 5 --retry-delay 2 -o "$WAL_RUNNER_ARCHIVE" "$WAL_RUNNER_URL" \
             || fail "téléchargement du runner GE-Proton impossible"
