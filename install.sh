@@ -144,22 +144,13 @@ else
         fail "ni curl ni wget n'est disponible pour télécharger le runner GE-Proton"
     fi
     gzip -t "$WAL_RUNNER_ARCHIVE" || fail "archive GE-Proton invalide ou incomplète"
-    WAL_RUNNER_EXTRACT="$WORK/runner-extract"
-    mkdir -p "$WAL_RUNNER_EXTRACT"
-    tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_EXTRACT" \
-        || fail "extraction du runner GE-Proton impossible"
-    # La release a une enveloppe Proton (proton, protonfixes, etc.) et les
-    # fichiers Wine attendus sont dans <release>/files/{bin,lib,share}.
-    WAL_RUNNER_FILES="$(find "$WAL_RUNNER_EXTRACT" -mindepth 2 -maxdepth 2 -type d -name files -print -quit)"
-    [ -n "$WAL_RUNNER_FILES" ] || fail "dossier files introuvable dans l'archive GE-Proton"
-    for dir in bin lib share; do
-        [ -d "$WAL_RUNNER_FILES/$dir" ] \
-            || fail "dossier $dir introuvable dans $WAL_RUNNER_FILES"
-    done
+    WAL_RUNNER_CUSTOM="$(dirname "$WAL_RUNNER")"
+    mkdir -p "$WAL_RUNNER_CUSTOM"
+    # L'archive du dépôt contient déjà le dossier GE-Proton complet à sa racine.
+    # On l'extrait donc directement dans wine/custom pour garder son arborescence.
     rm -rf "$WAL_RUNNER"
-    mkdir -p "$WAL_RUNNER"
-    cp -a "$WAL_RUNNER_FILES/." "$WAL_RUNNER/" \
-        || fail "installation des fichiers Wine du runner GE-Proton impossible"
+    tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_CUSTOM" \
+        || fail "extraction du runner GE-Proton dans $WAL_RUNNER_CUSTOM impossible"
     [ -x "$WAL_RUNNER/bin/wine" ] \
         || fail "le runner extrait ne contient pas bin/wine exécutable dans $WAL_RUNNER"
     [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ] \
