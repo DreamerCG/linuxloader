@@ -233,6 +233,11 @@ chmod +x "$DEST/system/dcg/configgen/dcglauncher" 2>/dev/null || true
 chmod +x "$DEST/system/dcg/bin/batocera-wine" 2>/dev/null || true
 chmod +x "$DEST/system/dcg/bin/batocera-wine-guns" 2>/dev/null || true
 
+GAMESCOPE="$DEST/system/dcg/gamescope"
+if [ -d "$GAMESCOPE" ]; then
+    find "$GAMESCOPE" -maxdepth 1 -type f -exec chmod +x {} +
+fi
+
 LL="$DEST/system/dcg/emulators/linuxloader"
 if [ -d "$LL" ]; then
     chmod -R 755 "$LL"
