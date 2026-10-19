@@ -235,7 +235,10 @@ chmod +x "$DEST/system/dcg/bin/batocera-wine-guns" 2>/dev/null || true
 
 GAMESCOPE="$DEST/system/dcg/gamescope"
 if [ -d "$GAMESCOPE" ]; then
-    find "$GAMESCOPE" -maxdepth 1 -type f -exec chmod +x {} +
+    for f in gamescope gamescopectl gamescopereaper gamescopestream Xwayland; do
+        [ -f "$GAMESCOPE/$f" ] || fail "binaire Gamescope introuvable : $GAMESCOPE/$f"
+        chmod +x "$GAMESCOPE/$f" || fail "impossible d'appliquer les droits d'exécution à $GAMESCOPE/$f"
+    done
 fi
 
 LL="$DEST/system/dcg/emulators/linuxloader"
