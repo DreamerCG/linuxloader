@@ -12,7 +12,8 @@ from configgen.batoceraPaths import BATOCERA_ES_DIR, CONFIGS, USER_ES_DIR, confi
 from configgen.controller import Controller, generate_sdl_game_controller_config
 from configgen.input import Input
 from configgen.generators.Generator import Generator
-# from configgen.utils.gamescope import gamescope_args
+from dcg_launch.gamescope_links import ensure_gamescope_links
+from dcg_launch.gamescope_options import gamescope_args
 
 if TYPE_CHECKING:
     from configgen.types import HotkeysContext
@@ -112,6 +113,7 @@ class WindowsArcadeLoaderGenerator(Generator):
                 },
             )
 
+        ensure_gamescope_links()
         mkdir_if_not_exists(WAL_CONFIG)
 
         # ES options -> profile keys (top level or under input:), set ones only.
@@ -150,7 +152,7 @@ class WindowsArcadeLoaderGenerator(Generator):
                 gamescope_keys['width'] = str(int(width))
                 gamescope_keys['height'] = str(int(height))
             # a JSON list is a YAML flow sequence
-            gamescope_keys['args'] = json.dumps(gamescope_args(system, gameResolution, nested=False))
+            gamescope_keys['args'] = json.dumps(gamescope_args(system.config, gameResolution, nested=False))
 
         lines = [f'{key}: {value}' for key, value in top.items()]
         if input_keys:

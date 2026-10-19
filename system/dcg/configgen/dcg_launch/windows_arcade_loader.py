@@ -14,6 +14,8 @@ from batocera_launch.devices.input import Input
 from batocera_launch.emulator import Emulator
 from batocera_launch.paths import SYSTEM_ES_DIR, USER_ES_DIR, configure_emulator
 from batocera_launch.types import HotkeysContext
+from dcg_launch.gamescope_links import ensure_gamescope_links
+from dcg_launch.gamescope_options import gamescope_args
 
 _logger = logging.getLogger(__name__)
 
@@ -114,6 +116,7 @@ class WindowsArcadeLoader(Emulator):
                 },
             )
 
+        ensure_gamescope_links()
         WAL_CONFIG.mkdir(parents=True, exist_ok=True)
 
         top: dict[str, str] = {}
@@ -155,6 +158,13 @@ class WindowsArcadeLoader(Emulator):
                 if separator:
                     gamescope_keys["width"] = str(int(width))
                     gamescope_keys["height"] = str(int(height))
+            gamescope_keys["args"] = json.dumps(
+                gamescope_args(
+                    self.config,
+                    {"width": self.resolution.width, "height": self.resolution.height},
+                    nested=False,
+                )
+            )
 
         lines = [f"{key}: {value}" for key, value in top.items()]
         if input_keys:

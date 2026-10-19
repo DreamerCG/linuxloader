@@ -27,7 +27,7 @@ gamescope:
   enabled: true
   width: 1360
   height: 768
-  args: [-S, fit, -f]
+  args: [-S, fit, -f, --backend, sdl]
 
 env:
   WAL_ANSI_CODEPAGE: "932"
@@ -40,7 +40,7 @@ env:
   # Unused channels must remain centered, rather than at the minimum value.
   WAL_TYPEX_JVS_ANALOG: 8000,8000,8000,8000,8000,8000,8000,8000
   WAL_TYPEX_JVS_ANALOG_INPUTS: ",rx,ry,-ly,-lx"
-
+  
 input:
   stick_as_dpad: false
   keyboard:
