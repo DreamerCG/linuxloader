@@ -9,7 +9,7 @@ set -e
 
 REPO_URL="${ARCHIVE_URL:-https://github.com/DreamerCG/linuxloader/archive/refs/heads/main.tar.gz}"
 WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz}"
-WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7-x86_64.tar.gz}"
+WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-10/GE-Proton11-10-x86_64.tar.gz}"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
 WORK="$DEST/system/.dcg_install_tmp"
