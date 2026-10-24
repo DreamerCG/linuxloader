@@ -271,11 +271,22 @@ step "Préconfiguration des jeux (batocera.conf)"
 BATOCERA_CONF="$DEST/system/batocera.conf"
 [ -f "$BATOCERA_CONF" ] || touch "$BATOCERA_CONF"
 
-# Ajoute "clé=valeur" à la fin du fichier, uniquement si la clé n'existe pas
-# déjà (une valeur déjà définie par l'utilisateur n'est jamais modifiée).
-conf_add() {
+# Ajoute ou remplace les clés fournies par temp.conf, sans modifier les autres.
+conf_set() {
     local line="$1" key="${1%%=*}"
     if awk -v k="$key=" 'index($0, k) == 1 { found = 1 } END { exit !found }' "$BATOCERA_CONF"; then
+        local tmp_conf
+        tmp_conf="$(mktemp "${BATOCERA_CONF}.XXXXXX")" \
+            || fail "création d'un fichier temporaire pour batocera.conf impossible"
+        cp -p "$BATOCERA_CONF" "$tmp_conf" \
+            || fail "copie des permissions de batocera.conf impossible"
+        awk -v k="$key=" -v replacement="$line" '
+            index($0, k) == 1 { print replacement; next }
+            { print }
+        ' "$BATOCERA_CONF" > "$tmp_conf" \
+            || { rm -f "$tmp_conf"; fail "mise à jour de batocera.conf impossible"; }
+        mv "$tmp_conf" "$BATOCERA_CONF" \
+            || { rm -f "$tmp_conf"; fail "remplacement de batocera.conf impossible"; }
         return 1
     fi
     # S'assure que le fichier se termine par un saut de ligne
@@ -291,17 +302,17 @@ conf_add() {
 
 CONF_HEADER_DONE=0
 CONF_ADDED=0
-CONF_SKIPPED=0
+CONF_UPDATED=0
 
 TEMP_CONF="$SRC/temp.conf"
 if [ -f "$TEMP_CONF" ]; then
     sed -i 's/\r$//' "$TEMP_CONF"
     while IFS= read -r line || [ -n "$line" ]; do
         case "$line" in ''|\#*) continue ;; esac
-        if conf_add "$line"; then
+        if conf_set "$line"; then
             CONF_ADDED=$((CONF_ADDED + 1))
         else
-            CONF_SKIPPED=$((CONF_SKIPPED + 1))
+            CONF_UPDATED=$((CONF_UPDATED + 1))
         fi
     done < "$TEMP_CONF"
 else
@@ -310,10 +321,13 @@ fi
 
 if [ "$CONF_ADDED" -gt 0 ]; then
     ok "$CONF_ADDED ligne(s) ajoutée(s) à batocera.conf"
-else
+fi
+if [ "$CONF_UPDATED" -gt 0 ]; then
+    ok "$CONF_UPDATED ligne(s) de batocera.conf mises à jour depuis temp.conf"
+fi
+if [ "$CONF_ADDED" -eq 0 ] && [ "$CONF_UPDATED" -eq 0 ]; then
     ok "batocera.conf déjà à jour"
 fi
-[ "$CONF_SKIPPED" -gt 0 ] && ok "$CONF_SKIPPED ligne(s) déjà présente(s), conservée(s) telles quelles"
 
 # --- 7. Vérification -------------------------------------------------------
 step "Vérification"
