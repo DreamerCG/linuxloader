@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
+
+_logger = logging.getLogger(__name__)
 
 
 def _get_str(config: object, key: str) -> str:
@@ -36,6 +39,10 @@ def gamescope_args(
 ) -> list[str]:
     """Build Gamescope arguments; nested=False leaves game sizing to the loader profile."""
     args: list[str] = []
+
+    backend = _get_str(config, "gamescope_backend")
+    if backend in ("sdl", "drm"):
+        args.extend(["--backend", backend])
 
     output_resolution = _get_str(config, "gamescope_output_resolution")
     if output_resolution:
@@ -96,4 +103,5 @@ def gamescope_args(
     if reshade_effect:
         args.extend(["--reshade-effect", reshade_effect])
 
+    _logger.debug("GameScope arguments: %s", args)
     return args

@@ -147,6 +147,7 @@ class WindowsArcadeLoader(Emulator):
         gamescope_options_set = any(
             str(self.config.get(key) or "") != ""
             and not (key in _GAMESCOPE_SWITCHES and self.config.get(key) == "0")
+            and not (key == "gamescope_backend" and self.config.get(key) == "auto")
             for key in self.config.keys()
             if key.startswith("gamescope_")
         )

@@ -144,7 +144,11 @@ class WindowsArcadeLoaderGenerator(Generator):
         def gamescope_option_set(key: str) -> bool:
             value = str(system.config.get(key) or '')
             # switches (HDR...) set to Off do not count
-            return value != '' and not (key in _GAMESCOPE_SWITCHES and value == '0')
+            return (
+                value != ''
+                and not (key in _GAMESCOPE_SWITCHES and value == '0')
+                and not (key == 'gamescope_backend' and value == 'auto')
+            )
 
         if gamescope != '0' and any(k.startswith('gamescope_') and gamescope_option_set(k) for k in system.config.keys()):
             gamescope = '1'
