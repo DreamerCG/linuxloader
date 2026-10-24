@@ -134,6 +134,11 @@ class WindowsArcadeLoader(Emulator):
         if mouse_guns in ("0", "1"):
             input_keys["guns_mouse"] = _yaml_scalar(mouse_guns == "1")
 
+        env_keys: dict[str, str] = {}
+        keep_aspect = self.config.get("keep_aspect_ratio")
+        if keep_aspect in ("on", "off"):
+            env_keys["WAL_KEEP_ASPECT_RATIO"] = _yaml_scalar("1" if keep_aspect == "on" else "0")
+
         keyboard = self.config.get("wal_keyboard")
         if keyboard in ("0", "1"):
             input_keys["keyboard_enabled"] = _yaml_scalar(keyboard == "1")
@@ -170,6 +175,9 @@ class WindowsArcadeLoader(Emulator):
         if input_keys:
             lines.append("input:")
             lines.extend(f"  {key}: {value}" for key, value in input_keys.items())
+        if env_keys:
+            lines.append("env:")
+            lines.extend(f"  {key}: {value}" for key, value in env_keys.items())
         if gamescope_keys:
             lines.append("gamescope:")
             lines.extend(f"  {key}: {value}" for key, value in gamescope_keys.items())
