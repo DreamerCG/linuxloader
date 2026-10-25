@@ -39,7 +39,15 @@ EMULATOR_RENAMES = {'linuxloader': 'linuxloader-dcg'}
 
 # Batocera >= 44 uniquement : 'wine' passe par notre WineGenerator pour ces
 # systemes. Les autres (dont 'windows') gardent le wine natif de Batocera.
-DCG_WINE_SYSTEMS = {'teknoparrot', 'windows_squash'}
+DCG_WINE_SYSTEMS = {
+    'teknoparrot',
+    'windows_squash',
+    'nesicax',
+    'nesicax2',
+    'rawthrills',
+    'typex',
+    'typex2',
+}
 
 # Batocera 44 sans configgen : on enveloppe nos anciens generateurs dans
 # l'interface Emulator de batocera-launch.

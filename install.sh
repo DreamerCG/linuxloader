@@ -222,6 +222,11 @@ step "Finalisation (fins de ligne, droits, dossiers)"
 for f in \
     "$DEST/system/dcg/configgen/dcglauncher" \
     "$DEST/system/configs/emulationstation/es_systems_teknoparrot.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_nesicax.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_nesicax2.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_rawthrills.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_typex.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_typex2.cfg" \
     "$DEST/system/configs/emulationstation/es_features_linuxloader.cfg" \
     "$DEST/system/configs/emulationstation/es_features_windowsarcadeloader.cfg"; do
     [ -f "$f" ] && sed -i 's/\r$//' "$f"
@@ -263,8 +268,15 @@ if [ -f "$SVC" ]; then
     ok "Service dcg_update installé"
 fi
 
-mkdir -p "$DEST/roms/teknoparrot" "$DEST/system/configs/linuxloader"
-ok "Dossiers créés (roms/teknoparrot, configs/linuxloader)"
+mkdir -p \
+    "$DEST/roms/teknoparrot" \
+    "$DEST/roms/nesicax" \
+    "$DEST/roms/nesicax2" \
+    "$DEST/roms/rawthrills" \
+    "$DEST/roms/typex" \
+    "$DEST/roms/typex2" \
+    "$DEST/system/configs/linuxloader"
+ok "Dossiers ROM et configs créés"
 
 # --- 6. Préconfiguration des jeux (batocera.conf) --------------------------
 step "Préconfiguration des jeux (batocera.conf)"
@@ -342,6 +354,11 @@ for f in \
     system/dcg/emulators/windows-arcade-loader/launcher.yaml \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz \
     system/configs/emulationstation/es_systems_teknoparrot.cfg \
+    system/configs/emulationstation/es_systems_nesicax.cfg \
+    system/configs/emulationstation/es_systems_nesicax2.cfg \
+    system/configs/emulationstation/es_systems_rawthrills.cfg \
+    system/configs/emulationstation/es_systems_typex.cfg \
+    system/configs/emulationstation/es_systems_typex2.cfg \
     system/configs/emulationstation/es_features_linuxloader.cfg \
     system/configs/emulationstation/es_features_windowsarcadeloader.cfg; do
     if [ -e "$DEST/$f" ]; then
