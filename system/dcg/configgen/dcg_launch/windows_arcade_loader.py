@@ -88,6 +88,10 @@ def _yaml_scalar(value: str | bool) -> str:
         return "true" if value else "false"
     return json.dumps(value)
 
+def _player_pads(controllers) -> str:
+    # ES's player order (P1 first) by evdev node: the launcher gives the players in it, under
+    # the GUI's priority list (userprofiles/players.yaml)
+    return ';'.join(c.device_path for c in controllers if c.device_path)
 
 @cached_dataclass
 class WindowsArcadeLoader(Emulator):
@@ -105,6 +109,7 @@ class WindowsArcadeLoader(Emulator):
     def needs_overlayfs(self, _rom: Path, /) -> bool:
         return True
 
+
     async def configure(self) -> Command:
         if configure_emulator(self.rom):
             controllers = list(self.controllers) or _es_pads()
@@ -113,6 +118,7 @@ class WindowsArcadeLoader(Emulator):
                 env={
                     "SDL_GAMECONTROLLERCONFIG": generate_sdl_game_controller_config(controllers),
                     "SDL_JOYSTICK_HIDAPI": "0",
+                    'WAL_PLAYER_PADS': _player_pads(controllers),
                 },
             )
 
@@ -201,5 +207,6 @@ class WindowsArcadeLoader(Emulator):
             env={
                 "SDL_GAMECONTROLLERCONFIG": generate_sdl_game_controller_config(list(self.controllers)),
                 "SDL_JOYSTICK_HIDAPI": "0",
+                'WAL_PLAYER_PADS': _player_pads(self.controllers),
             },
         )

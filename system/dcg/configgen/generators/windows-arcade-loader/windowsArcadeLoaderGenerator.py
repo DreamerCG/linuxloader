@@ -84,6 +84,12 @@ def _es_pads() -> list[Controller]:
     return list(pads.values())
 
 
+def _player_pads(controllers) -> str:
+    # ES's player order (P1 first) by evdev node: the launcher gives the players in it, under
+    # the GUI's priority list (userprofiles/players.yaml)
+    return ';'.join(c.device_path for c in controllers if c.device_path)
+
+
 def _yaml_scalar(value: str | bool) -> str:
     if isinstance(value, bool):
         return 'true' if value else 'false'
@@ -110,6 +116,7 @@ class WindowsArcadeLoaderGenerator(Generator):
                 env={
                     'SDL_GAMECONTROLLERCONFIG': generate_sdl_game_controller_config(playersControllers or _es_pads()),
                     'SDL_JOYSTICK_HIDAPI': '0',
+                    'WAL_PLAYER_PADS': _player_pads(playersControllers or []),
                 },
             )
 
@@ -184,5 +191,6 @@ class WindowsArcadeLoaderGenerator(Generator):
             env={
                 'SDL_GAMECONTROLLERCONFIG': generate_sdl_game_controller_config(playersControllers),
                 'SDL_JOYSTICK_HIDAPI': '0',
+                'WAL_PLAYER_PADS': _player_pads(playersControllers),
             },
         )
