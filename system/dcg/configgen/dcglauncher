@@ -47,6 +47,9 @@ DCG_WINE_SYSTEMS = {
     'rawthrills',
     'typex',
     'typex2',
+    "segarw",
+    "segare",
+    "konamipc",     
 }
 
 # Batocera 44 sans configgen : on enveloppe nos anciens generateurs dans
