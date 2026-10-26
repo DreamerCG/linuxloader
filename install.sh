@@ -268,15 +268,35 @@ if [ -f "$SVC" ]; then
     ok "Service dcg_update installé"
 fi
 
-mkdir -p \
-    "$DEST/roms/teknoparrot" \
-    "$DEST/roms/nesicax" \
-    "$DEST/roms/nesicax2" \
-    "$DEST/roms/rawthrills" \
-    "$DEST/roms/typex" \
-    "$DEST/roms/typex2" \
-    "$DEST/system/configs/linuxloader"
-ok "Dossiers ROM et configs créés"
+# Crée les dossiers ROM uniquement s'ils ne sont pas des liens symboliques existants.
+for dir in \
+    teknoparrot \
+    nesicax \
+    nesicax2 \
+    rawthrills \
+    typex \
+    typex2; do
+
+    path="$DEST/roms/$dir"
+
+    if [ -L "$path" ]; then
+        # Conserve le lien symbolique, même si sa cible est inaccessible.
+        continue
+    fi
+
+    if [ -d "$path" ]; then
+        continue
+    fi
+
+    if ! mkdir -p "$path" 2>/dev/null; then
+        warn "Impossible de créer $path (dossier ou NAS inaccessible)"
+    fi
+done
+
+mkdir -p "$DEST/system/configs/linuxloader" \
+    || warn "Impossible de créer le dossier de configuration LinuxLoader"
+
+ok "Dossiers ROM et configs vérifiés"
 
 # --- 6. Préconfiguration des jeux (batocera.conf) --------------------------
 step "Préconfiguration des jeux (batocera.conf)"
