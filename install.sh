@@ -227,6 +227,9 @@ for f in \
     "$DEST/system/configs/emulationstation/es_systems_rawthrills.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_typex.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_typex2.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_segare.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_segarw.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_konamipc.cfg" \
     "$DEST/system/configs/emulationstation/es_features_linuxloader.cfg" \
     "$DEST/system/configs/emulationstation/es_features_windowsarcadeloader.cfg"; do
     [ -f "$f" ] && sed -i 's/\r$//' "$f"
@@ -271,6 +274,9 @@ fi
 # Crée les dossiers ROM uniquement s'ils ne sont pas des liens symboliques existants.
 for dir in \
     teknoparrot \
+    segare \
+    segarw \
+    konamipc \
     nesicax \
     nesicax2 \
     rawthrills \
