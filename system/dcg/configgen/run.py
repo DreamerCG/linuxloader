@@ -43,6 +43,9 @@ def run_batocera_launch() -> None:
         "rawthrills",
         "typex",
         "typex2",
+        "segarw",
+        "segare",
+        "konamipc",                        
     }:
         emulator = "wine-dcg"
         sys.argv[sys.argv.index("-emulator") + 1] = emulator
