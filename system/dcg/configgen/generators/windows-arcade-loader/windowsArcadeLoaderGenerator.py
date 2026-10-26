@@ -141,6 +141,10 @@ class WindowsArcadeLoaderGenerator(Generator):
         if keep_aspect in ('on', 'off'):
             # games whose picture the payload scales to the screen (Gashaaaan)
             env_keys['WAL_KEEP_ASPECT_RATIO'] = _yaml_scalar('1' if keep_aspect == 'on' else '0')
+        crosshair = system.config.get('wal_crosshair')
+        if crosshair in ('0', '1'):
+            # the common crosshair option of the games able to show crosshairs
+            env_keys['WAL_CROSSHAIR'] = _yaml_scalar(crosshair)
         keyboard = system.config.get('wal_keyboard')
         if keyboard in ('0', '1'):
             input_keys['keyboard_enabled'] = _yaml_scalar(keyboard == '1')

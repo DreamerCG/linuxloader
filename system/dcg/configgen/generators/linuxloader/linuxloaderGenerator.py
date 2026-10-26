@@ -60,8 +60,8 @@ _logger = logging.getLogger(__name__)
 # Nirin (a motorbike game) drives like the driving games (left stick or
 # wheel, R2 gas, L2 brake); its buttons and gears are its own (_PAD_BIKE).
 # Dead Heat and Dead Heat Riders steer with the left stick or the wheel and
-# accelerate with R2; Dead Heat brakes with L2 as a pedal, Dead Heat Riders
-# as its brake switch. Their buttons are their own (_PAD_DEADHEAT,
+# accelerate with R2; both brake with their brake switch (L2, and x for
+# Dead Heat). Their buttons are their own (_PAD_DEADHEAT,
 # _PAD_DHRIDERS). Maximum Heat 3D (Dead Heat's later build) drives as Dead
 # Heat.
 #
@@ -165,8 +165,11 @@ _PAD_MOTOGP: Final = {
 }
 
 # Tank! Tank! Tank!: the cabinet's wheel on the left stick, its two pedals
-# on R2/L2 (as a driving game's), a (right face button) fires and b (bottom)
-# is the safety button; up/down move in the menus.
+# on R2/L2 (as a driving game's), L1 or x (top face button) the left fire
+# button and R1 or y (left) the right one (player 1's left and right
+# switches on the cabinet, _TANK_FIRE), a (right) Enter and b (bottom) the
+# safety button; up/down move in the menus.
+_TANK_FIRE: Final = {'BUTTON_LEFT': ('pageup', 'x'), 'BUTTON_RIGHT': ('pagedown', 'y')}
 _PAD_TANK: Final = {
     'a': 'BUTTON_1',
     'b': 'BUTTON_2',
@@ -185,15 +188,20 @@ _PAD_BIKE: Final = {
     'up': 'BUTTON_UP',
     'down': 'BUTTON_DOWN',
 }
+
+# L1/R1 (a wheel's paddles too) shift down and up in Dead Heat: player 2's
+# down and up on the cabinet.
 _BIKE_SHIFT: Final = {'pageup': 'PLAYER_2_BUTTON_DOWN', 'pagedown': 'PLAYER_2_BUTTON_UP'}
 
-# Dead Heat: b (bottom face button) is Enter, a (right) the view, y (left)
-# the nitrous; L1/R1 (a wheel's paddles too) shift down and up, player 2's
+# Dead Heat (and Maximum Heat 3D): b (bottom face button) is Enter, a
+# (right) the view (BUTTON_5, the keyboard's V), y (left) the nitrous
+# (BUTTON_4, C), x (top) and L2 the brake, a button on the cabinet
+# (BUTTON_3, X); L1/R1 (a wheel's paddles too) shift down and up, player 2's
 # down and up on the cabinet; up/down move in the menus.
 _PAD_DEADHEAT: Final = {
     'b': 'BUTTON_1',
-    'a': 'BUTTON_2',
-    'y': 'BUTTON_3',
+    'a': 'BUTTON_5',
+    'y': 'BUTTON_4',
     'up': 'BUTTON_UP',
     'down': 'BUTTON_DOWN',
 }
@@ -435,13 +443,16 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             for name, action in _PAD_DHRIDERS.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
             return
-        _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'l2', digital=False))
         if kind == 'deadheat':
             for name, action in _PAD_DEADHEAT.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            # The brake button: x and L2 (a wheel's brake pedal) both.
+            brake = (_pad_input(pad, 'x', digital=True), _pad_input(pad, 'l2', digital=True))
+            _set(evdev, player + 'BUTTON_3', ','.join(dict.fromkeys(b for b in brake if b)) or None)
             for name, key in _BIKE_SHIFT.items():
                 _set(evdev, key, _pad_input(pad, name, digital=True))
             return
+        _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'l2', digital=False))
         if kind == 'motogp':
             for name, action in _PAD_MOTOGP.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
@@ -449,12 +460,13 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         if kind == 'tank':
             for name, action in _PAD_TANK.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            for action, names in _TANK_FIRE.items():
+                sources = (_pad_input(pad, name, digital=True) for name in names)
+                _set(evdev, player + action, ','.join(dict.fromkeys(s for s in sources if s)) or None)
             return
         if kind == 'bike':
             for name, action in _PAD_BIKE.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
-            for name, key in _BIKE_SHIFT.items():
-                _set(evdev, key, _pad_input(pad, name, digital=True))
             return
         for name, action in (_WHEEL_DRIVING if wheel else _PAD_DRIVING).items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))

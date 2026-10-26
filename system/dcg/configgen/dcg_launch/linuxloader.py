@@ -41,11 +41,12 @@ _PAD_DRIVING: Final = {
 }
 _WHEEL_DRIVING: Final = {**_PAD_DRIVING, "pageup": "BUTTON_2", "pagedown": "BUTTON_3"}
 _PAD_MOTOGP: Final = {"up": "BUTTON_7", "down": "BUTTON_8"}
+_TANK_FIRE: Final = {"BUTTON_LEFT": ('pageup', 'x'), "BUTTON_RIGHT": ('pagedown', 'y')}
 _PAD_TANK: Final = {"a": "BUTTON_1", "b": "BUTTON_2", "up": "BUTTON_UP", "down": "BUTTON_DOWN"}
 _PAD_BIKE: Final = {"b": "BUTTON_1", "a": "BUTTON_2", "y": "BUTTON_3", "up": "BUTTON_UP", "down": "BUTTON_DOWN"}
 _BIKE_SHIFT: Final = {"pageup": "PLAYER_2_BUTTON_DOWN", "pagedown": "PLAYER_2_BUTTON_UP"}
 _PAD_DEADHEAT: Final = {
-    "b": "BUTTON_1", "a": "BUTTON_2", "y": "BUTTON_3", "up": "BUTTON_UP", "down": "BUTTON_DOWN",
+    "b": "BUTTON_1", "a": "BUTTON_5", "y": "BUTTON_4", "up": "BUTTON_UP", "down": "BUTTON_DOWN",
 }
 
 _PAD_DHRIDERS: Final = {
@@ -227,26 +228,30 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
             for name, action in _PAD_DHRIDERS.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
             return
-        _set(evdev, "ANALOGUE_3", _pad_input(pad, "l2", digital=False))
-        if kind == "deadheat":
+        if kind == 'deadheat':
             for name, action in _PAD_DEADHEAT.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            # The brake button: x and L2 (a wheel's brake pedal) both.
+            brake = (_pad_input(pad, 'x', digital=True), _pad_input(pad, 'l2', digital=True))
+            _set(evdev, player + 'BUTTON_3', ','.join(dict.fromkeys(b for b in brake if b)) or None)
             for name, key in _BIKE_SHIFT.items():
                 _set(evdev, key, _pad_input(pad, name, digital=True))
             return
+        _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'l2', digital=False))
         if kind == "motogp":
             for name, action in _PAD_MOTOGP.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
             return
-        if kind == "tank":
+        if kind == 'tank':
             for name, action in _PAD_TANK.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            for action, names in _TANK_FIRE.items():
+                sources = (_pad_input(pad, name, digital=True) for name in names)
+                _set(evdev, player + action, ','.join(dict.fromkeys(s for s in sources if s)) or None)
             return
         if kind == "bike":
             for name, action in _PAD_BIKE.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
-            for name, key in _BIKE_SHIFT.items():
-                _set(evdev, key, _pad_input(pad, name, digital=True))
             return
         mapping = _WHEEL_DRIVING if wheel else _PAD_DRIVING
         for name, action in mapping.items():
