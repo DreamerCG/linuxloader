@@ -27,7 +27,7 @@ gamescope:
   enabled: true
   width: 1360
   height: 768
-  args: [-S, fit, -f, --backend, sdl]
+  args: [-S, fit, -f]
 
 env:
   WAL_ANSI_CODEPAGE: "932"
