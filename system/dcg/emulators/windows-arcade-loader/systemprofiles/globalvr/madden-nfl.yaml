@@ -1,0 +1,28 @@
+# EA SPORTS Madden NFL Football (Global VR) - template, override values in
+# userprofiles/globalvr/madden-nfl.yaml.
+# Madden NFL 2004 in its arcade build, MADDEN\MADDEN.exe: a mixed-mode .NET 1.1 program (its
+# cabinet data through PLUSDE.dll). Its controls: MaddenInputRaw.dll, the cabinet's two sticks
+# and buttons: the payload takes its place (payload madden.rs).
+system: globalvr
+name: "EA SPORTS Madden NFL Football"
+
+# .NET 1.1 (CLR 1.1), the prefix shared with Need for Speed Underground and Carbon.
+prefix: wine-prefix/dotnet11
+prefix_tricks: [dotnet11]
+
+payload_install: [MADDEN/MaddenInputRaw.dll]
+
+dll_overrides:
+  mscoree: n
+  mscorwks: n
+  fusion: n
+  # the native C++ runtime of the mixed-mode .NET code, in the dump next to the game
+  msvcr71: n,b
+  msvcp71: n,b
+
+# The dump's keyboard-to-pad mod (x360kb, as dinput8.dll): off.
+hide: [dinput8.dll]
+
+env:
+  # the game's own controllers off: the sticks and buttons come from MaddenInputRaw.dll
+  WAL_DINPUT_DISABLE: "1"

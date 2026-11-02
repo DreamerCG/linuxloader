@@ -9,6 +9,7 @@ set -e
 
 REPO_URL="${ARCHIVE_URL:-https://github.com/DreamerCG/linuxloader/archive/refs/heads/main.tar.gz}"
 WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz}"
+WAL_DOTNET11_URL="${WAL_DOTNET11_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz}"
 WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/GE-Proton11-10-x86_64.tar.gz}"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
@@ -92,6 +93,10 @@ WAL_PREFIX="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar
 INSTALLED_WAL_PREFIX="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz"
 WAL_PREFIX_VERSION="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.version"
 INSTALLED_WAL_PREFIX_VERSION="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.version"
+WAL_DOTNET11="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz"
+INSTALLED_WAL_DOTNET11="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz"
+WAL_DOTNET11_VERSION="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.version"
+INSTALLED_WAL_DOTNET11_VERSION="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.version"
 WAL_PREFIX_EXPECTED_SIZE=""
 WAL_PREFIX_EXPECTED_VERSION=""
 if [ -f "$WAL_PREFIX_VERSION" ]; then
@@ -125,6 +130,28 @@ if [ "$USE_INSTALLED_WAL_PREFIX" = 1 ]; then
     ok "Archive du préfixe Wine à jour, téléchargement ignoré"
 else
     resolve_lfs_archive "$WAL_PREFIX" "$WAL_PREFIX_URL" "l'archive du préfixe Wine"
+fi
+
+WAL_DOTNET11_EXPECTED_VERSION=""
+if [ -f "$WAL_DOTNET11_VERSION" ]; then
+    WAL_DOTNET11_EXPECTED_VERSION="$(tr -d '\r\n' < "$WAL_DOTNET11_VERSION")"
+    [ -n "$WAL_DOTNET11_EXPECTED_VERSION" ] || fail "fichier de version du préfixe .NET 1.1 vide"
+fi
+USE_INSTALLED_WAL_DOTNET11=0
+if [ -f "$INSTALLED_WAL_DOTNET11" ] \
+    && ! head -n 1 "$INSTALLED_WAL_DOTNET11" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
+    && gzip -t "$INSTALLED_WAL_DOTNET11" >/dev/null 2>&1 \
+    && [ -n "$WAL_DOTNET11_EXPECTED_VERSION" ] \
+    && [ -f "$INSTALLED_WAL_DOTNET11_VERSION" ] \
+    && [ "$(tr -d '\r\n' < "$INSTALLED_WAL_DOTNET11_VERSION")" = "$WAL_DOTNET11_EXPECTED_VERSION" ]; then
+    USE_INSTALLED_WAL_DOTNET11=1
+fi
+if [ "$USE_INSTALLED_WAL_DOTNET11" = 1 ]; then
+    cp -p "$INSTALLED_WAL_DOTNET11" "$WAL_DOTNET11" \
+        || fail "réutilisation de l'archive du préfixe .NET 1.1 installée impossible"
+    ok "Archive du préfixe .NET 1.1 à jour, téléchargement ignoré"
+else
+    resolve_lfs_archive "$WAL_DOTNET11" "$WAL_DOTNET11_URL" "l'archive du préfixe .NET 1.1"
 fi
 
 # Le runner GE-Proton 11-10 est stocké dans le dépôt Git LFS. L'extraction avec
@@ -379,6 +406,8 @@ for f in \
     system/dcg/emulators/windows-arcade-loader/arcade-launcher \
     system/dcg/emulators/windows-arcade-loader/launcher.yaml \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.version \
     system/configs/emulationstation/es_systems_teknoparrot.cfg \
     system/configs/emulationstation/es_systems_nesicax.cfg \
     system/configs/emulationstation/es_systems_nesicax2.cfg \
