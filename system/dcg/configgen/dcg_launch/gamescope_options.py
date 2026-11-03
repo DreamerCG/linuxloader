@@ -69,13 +69,18 @@ def gamescope_profile(
     profile_id = game_id
     if not (system_profile_dir / f"{profile_id}.yaml").is_file():
         rom_name_tokens = set(re.findall(r"[a-z0-9]+", game_id.lower()))
+        normalized_game_id = " ".join(game_id.casefold().split())
         candidates: list[tuple[int, str, str]] = []
+        exact_matches: list[tuple[str, str]] = []
         for candidate in system_profiles_dir.glob("*/*.yaml"):
             for line in candidate.read_text(encoding="utf-8").splitlines():
                 match = re.match(r"^\s*name:\s*(.*?)\s*(?:#.*)?$", line)
                 if not match:
                     continue
                 name = match.group(1).strip().strip("\"'")
+                normalized_name = " ".join(name.casefold().split())
+                if normalized_name == normalized_game_id:
+                    exact_matches.append((candidate.parent.name, candidate.stem))
                 name_tokens = set(re.findall(r"[a-z0-9]+", name.lower()))
                 compact_name = "".join(re.findall(r"[a-z0-9]+", name.lower()))
                 compact_rom_name = "".join(re.findall(r"[a-z0-9]+", game_id.lower()))
@@ -86,21 +91,24 @@ def gamescope_profile(
                     candidates.append((len(name_tokens), candidate.parent.name, candidate.stem))
                 break
 
-        if candidates:
+        if exact_matches:
+            best_matches = exact_matches
+        elif candidates:
             best_score = max(score for score, _, _ in candidates)
             best_matches = [
                 (candidate_system, candidate_id)
                 for score, candidate_system, candidate_id in candidates
                 if score == best_score
             ]
-            if len(best_matches) != 1:
-                raise ValueError(
-                    f"Ambiguous WAL profile name for {system}/{game_id}: {best_matches}"
-                )
-            profile_system, profile_id = best_matches[0]
-            system_profile_dir = system_profiles_dir / profile_system
         else:
             return None
+
+        if len(best_matches) != 1:
+            raise ValueError(
+                f"Ambiguous WAL profile name for {system}/{game_id}: {best_matches}"
+            )
+        profile_system, profile_id = best_matches[0]
+        system_profile_dir = system_profiles_dir / profile_system
 
     has_gamescope = False
     args: list[str] = []
