@@ -58,6 +58,26 @@ def gamescope_config_values(config: object) -> dict[str, object | None]:
     return {key: _get_value(config, key) for key in GAMESCOPE_CONFIG_KEYS}
 
 
+def wal_game_id(rom: Path) -> str:
+    """Return the game ID from its WindowsLoader marker, or the ROM name as a fallback."""
+    if rom.is_dir():
+        markers = [
+            path
+            for path in rom.iterdir()
+            if path.is_file() and path.suffix.casefold() == ".windowsloader"
+        ]
+        markers.sort(key=lambda path: path.name.casefold())
+        if len(markers) > 1:
+            raise ValueError(
+                f"Multiple WindowsLoader markers in {rom}: {[path.name for path in markers]}"
+            )
+        if markers:
+            return markers[0].stem
+    elif rom.suffix.casefold() == ".windowsloader":
+        return rom.stem
+    return rom.stem
+
+
 def gamescope_profile(
     wal_dir: Path,
     system: str,
@@ -70,9 +90,12 @@ def gamescope_profile(
     if not (system_profile_dir / f"{profile_id}.yaml").is_file():
         rom_name_tokens = set(re.findall(r"[a-z0-9]+", game_id.lower()))
         normalized_game_id = " ".join(game_id.casefold().split())
+        profile_id_matches: list[tuple[str, str]] = []
         candidates: list[tuple[int, str, str]] = []
         exact_matches: list[tuple[str, str]] = []
         for candidate in system_profiles_dir.glob("*/*.yaml"):
+            if candidate.stem.casefold() == game_id.casefold():
+                profile_id_matches.append((candidate.parent.name, candidate.stem))
             for line in candidate.read_text(encoding="utf-8").splitlines():
                 match = re.match(r"^\s*name:\s*(.*?)\s*(?:#.*)?$", line)
                 if not match:
@@ -91,7 +114,9 @@ def gamescope_profile(
                     candidates.append((len(name_tokens), candidate.parent.name, candidate.stem))
                 break
 
-        if exact_matches:
+        if profile_id_matches:
+            best_matches = profile_id_matches
+        elif exact_matches:
             best_matches = exact_matches
         elif candidates:
             best_score = max(score for score, _, _ in candidates)

@@ -13,7 +13,12 @@ from configgen.controller import Controller, generate_sdl_game_controller_config
 from configgen.input import Input
 from configgen.generators.Generator import Generator
 from dcg_launch.gamescope_links import ensure_gamescope_links
-from dcg_launch.gamescope_options import gamescope_args, gamescope_config_values, gamescope_profile
+from dcg_launch.gamescope_options import (
+    gamescope_args,
+    gamescope_config_values,
+    gamescope_profile,
+    wal_game_id,
+)
 
 if TYPE_CHECKING:
     from configgen.types import HotkeysContext
@@ -27,7 +32,8 @@ _logger = logging.getLogger(__name__)
 #
 # The rom is a game dump directory holding <gameid>.windowsloader (the executable path
 # relative to the dump root): ES lists that file, the game id selects the profile. Or the
-# dump packed as a .squashfs image: configgen mounts it and hands the mounted directory;
+# dump packed as a .squashfs image: configgen mounts it and hands the mounted directory,
+# whose .windowsloader marker gives the game ID;
 # writesToRom() gives it a writable overlay kept in /userdata/saves/<system>/<image name>
 # (the game's save data in the dump's WindowsLoader folder).
 #
@@ -158,7 +164,7 @@ class WindowsArcadeLoaderGenerator(Generator):
         profile_gamescope = gamescope_profile(
             WAL_DIR,
             system.name,
-            Path(rom).stem,
+            wal_game_id(Path(rom)),
         )
         profile_has_gamescope = bool(profile_gamescope and profile_gamescope[0])
         profile_args = profile_gamescope[1] if profile_gamescope else []

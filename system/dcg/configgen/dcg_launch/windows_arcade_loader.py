@@ -16,7 +16,12 @@ from batocera_launch.emulator import Emulator
 from batocera_launch.paths import SYSTEM_ES_DIR, USER_ES_DIR, configure_emulator
 from batocera_launch.types import HotkeysContext
 from dcg_launch.gamescope_links import ensure_gamescope_links
-from dcg_launch.gamescope_options import gamescope_args, gamescope_config_values, gamescope_profile
+from dcg_launch.gamescope_options import (
+    gamescope_args,
+    gamescope_config_values,
+    gamescope_profile,
+    wal_game_id,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -28,7 +33,8 @@ _logger = logging.getLogger(__name__)
 # The rom is a game dump directory holding <gameid>.windowsloader (the executable path
 # relative to the dump root): ES lists that file, the game id selects the profile. Or the
 # dump packed as a .squashfs image: Batocera Launch mounts it and hands the mounted
-# directory; needs_overlayfs() gives it a writable overlay kept in
+# directory, whose .windowsloader marker gives the game ID; needs_overlayfs() gives it a
+# writable overlay kept in
 # /userdata/saves/<system>/<image name> (the game's save data in the dump's WindowsLoader folder).
 #
 # The ES options are written as an extra profile layer (--profile), merged over the game's
@@ -164,7 +170,7 @@ class WindowsArcadeLoader(Emulator):
         profile_gamescope = gamescope_profile(
             WAL_DIR,
             str(self.system),
-            self.rom.stem,
+            wal_game_id(self.rom),
         )
         profile_has_gamescope = bool(profile_gamescope and profile_gamescope[0])
         profile_args = profile_gamescope[1] if profile_gamescope else []
