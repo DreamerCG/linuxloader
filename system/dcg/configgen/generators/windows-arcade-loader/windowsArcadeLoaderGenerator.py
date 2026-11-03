@@ -248,6 +248,7 @@ class WindowsArcadeLoaderGenerator(Generator):
                     [f"    {controller}" for controller in controllers]
                     if controllers else ["    none"]
                 ),
+                f"=== Windows Arcade Loader ===",
             ]),
             file=sys.stderr,
         )
