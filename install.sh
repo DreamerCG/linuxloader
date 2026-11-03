@@ -159,7 +159,7 @@ fi
 WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-10-x86_64"
 WAL_RUNNER_CUSTOM="$(dirname "$WAL_RUNNER")"
 WAL_RUNNER_SOURCE="$SRC/GE-Proton11-10-x86_64.tar.gz"
-WAL_RUNNER_VERSION_FILE="$WAL_RUNNER_CUSTOM/GE-Proton11-10-x86_64.version"
+WAL_RUNNER_VERSION_FILE="$WAL_RUNNER/.version"
 [ -f "$WAL_RUNNER_SOURCE" ] || fail "archive GE-Proton introuvable dans l'archive du dépôt"
 WAL_RUNNER_EXPECTED_VERSION="$(awk '$1 == "oid" && $2 ~ /^sha256:/ { sub(/^sha256:/, "", $2); print $2; exit }' "$WAL_RUNNER_SOURCE")"
 if [ -z "$WAL_RUNNER_EXPECTED_VERSION" ]; then
