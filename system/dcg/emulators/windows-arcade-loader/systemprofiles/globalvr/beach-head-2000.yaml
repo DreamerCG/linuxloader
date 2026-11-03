@@ -36,7 +36,7 @@ graphics: dgvoodoo
 # The cabinet's 640x480 screen (the shell's pages and the game), scaled to the real one with its
 # aspect kept.
 gamescope:
-  enabled: false
+  enabled: true
   width: 640
   height: 480
   args: [-S, fit, -f]

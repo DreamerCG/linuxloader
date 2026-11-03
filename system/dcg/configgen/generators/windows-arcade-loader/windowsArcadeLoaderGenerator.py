@@ -13,7 +13,7 @@ from configgen.controller import Controller, generate_sdl_game_controller_config
 from configgen.input import Input
 from configgen.generators.Generator import Generator
 from dcg_launch.gamescope_links import ensure_gamescope_links
-from dcg_launch.gamescope_options import gamescope_args
+from dcg_launch.gamescope_options import gamescope_args, gamescope_config_values, gamescope_profile
 
 if TYPE_CHECKING:
     from configgen.types import HotkeysContext
@@ -149,6 +149,40 @@ class WindowsArcadeLoaderGenerator(Generator):
         if keyboard in ('0', '1'):
             input_keys['keyboard_enabled'] = _yaml_scalar(keyboard == '1')
 
+        gamescope_config = gamescope_config_values(system.config)
+        configured_gamescope_backend = str(gamescope_config['gamescope_backend'] or '').lower()
+        wayland_session = (
+            bool(os.environ.get('WAYLAND_DISPLAY'))
+            or os.environ.get('XDG_SESSION_TYPE', '').lower() == 'wayland'
+        )
+        profile_gamescope = gamescope_profile(
+            WAL_DIR,
+            system.name,
+            Path(rom).stem,
+        )
+        profile_has_gamescope = bool(profile_gamescope and profile_gamescope[0])
+        profile_args = profile_gamescope[1] if profile_gamescope else []
+        force_wayland_sdl = (
+            configured_gamescope_backend in ('', 'auto')
+            and wayland_session
+            and profile_has_gamescope
+        )
+        reported_backend = (
+            'ignored (profile has no gamescope section)'
+            if not profile_has_gamescope
+            else 'sdl (automatic)'
+            if force_wayland_sdl
+            else configured_gamescope_backend or 'auto'
+        )
+
+        print(
+            f"windows-arcade-loader: Gamescope configuration for {Path(rom).name}:\n"
+            + "\n".join(f"  {key} = {value!r}" for key, value in gamescope_config.items())
+            + f"\n  wayland_session = {wayland_session}"
+            + f"\n  effective_backend = {reported_backend}",
+            file=sys.stderr,
+        )
+
         gamescope_keys: dict[str, str] = {}
         gamescope = system.config.get('gamescope')
         # any GAMESCOPE option set turns it on (unless ENABLE is set to Off)
@@ -161,18 +195,78 @@ class WindowsArcadeLoaderGenerator(Generator):
                 and not (key == 'gamescope_backend' and value == 'auto')
             )
 
-        if gamescope != '0' and any(k.startswith('gamescope_') and gamescope_option_set(k) for k in system.config.keys()):
+        if gamescope != '0' and (
+            force_wayland_sdl
+            or any(k.startswith('gamescope_') and gamescope_option_set(k) for k in system.config.keys())
+        ):
             gamescope = '1'
         if gamescope in ('0', '1'):
             gamescope_keys['enabled'] = _yaml_scalar(gamescope == '1')
         if gamescope == '1':
+            effective_backend = (
+                'sdl' if force_wayland_sdl else configured_gamescope_backend
+            ) if profile_has_gamescope else ''
             nested = system.config.get('gamescope_nested_resolution')
             if nested:
                 width, _, height = nested.partition('x')
                 gamescope_keys['width'] = str(int(width))
                 gamescope_keys['height'] = str(int(height))
-            # a JSON list is a YAML flow sequence
-            gamescope_keys['args'] = json.dumps(gamescope_args(system.config, gameResolution, nested=False))
+            args_options_set = any(
+                str(system.config.get(key) or '') != ''
+                and key != 'gamescope_backend'
+                and not (key in _GAMESCOPE_SWITCHES and system.config.get(key) == '0')
+                for key in system.config.keys()
+                if key.startswith('gamescope_')
+            ) and profile_has_gamescope
+            needs_args_override = profile_has_gamescope and (
+                effective_backend in ('sdl', 'drm') or args_options_set
+            )
+            generated_gamescope_args: list[str] = []
+            if needs_args_override:
+                if effective_backend in ('sdl', 'drm'):
+                    generated_gamescope_args.extend(['--backend', effective_backend])
+                generated_gamescope_args.extend(profile_args or [])
+            if args_options_set:
+                # a JSON list is a YAML flow sequence
+                generated_gamescope_args.extend(gamescope_args(
+                    system.config,
+                    gameResolution,
+                    nested=False,
+                ))
+            if needs_args_override:
+                gamescope_keys['args'] = json.dumps(generated_gamescope_args)
+                print(
+                    f"windows-arcade-loader: Gamescope arguments written for "
+                    f"{Path(rom).name}: {generated_gamescope_args}",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"windows-arcade-loader: no Gamescope section in the WAL profile for "
+                    f"{Path(rom).name}; backend and argument overrides are ignored"
+                    if not profile_args
+                    else f"windows-arcade-loader: Gamescope profile arguments preserved "
+                    f"for {Path(rom).name}",
+                    file=sys.stderr,
+                )
+        elif force_wayland_sdl and gamescope == '0':
+            print(
+                f'windows-arcade-loader: Gamescope disabled by EmulationStation '
+                f'for {Path(rom).name}; Wayland SDL backend will not override it',
+                file=sys.stderr,
+            )
+        elif gamescope == '0':
+            print(
+                f'windows-arcade-loader: Gamescope disabled by EmulationStation '
+                f'for {Path(rom).name}',
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f'windows-arcade-loader: no Gamescope arguments generated by '
+                f'EmulationStation for {Path(rom).name}; game profile settings remain in effect',
+                file=sys.stderr,
+            )
 
         lines = [f'{key}: {value}' for key, value in top.items()]
         if input_keys:
