@@ -22,7 +22,7 @@ c_folders:
 
 # The frontend's and the game's 640x480 screen, scaled to the real one with its aspect kept.
 gamescope:
-  enabled: true
+  enabled: false
   width: 640
   height: 480
   args: [-S, fit, -f]

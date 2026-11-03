@@ -157,9 +157,32 @@ fi
 # Le runner GE-Proton 11-10 est stocké dans le dépôt Git LFS. L'extraction avec
 # tar préserve les permissions d'exécution nécessaires aux binaires Wine.
 WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-10-x86_64"
-if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
-    ok "Runner GE-Proton déjà installé, téléchargement ignoré"
+WAL_RUNNER_CUSTOM="$(dirname "$WAL_RUNNER")"
+WAL_RUNNER_SOURCE="$SRC/GE-Proton11-10-x86_64.tar.gz"
+WAL_RUNNER_VERSION_FILE="$WAL_RUNNER_CUSTOM/GE-Proton11-10-x86_64.version"
+[ -f "$WAL_RUNNER_SOURCE" ] || fail "archive GE-Proton introuvable dans l'archive du dépôt"
+WAL_RUNNER_EXPECTED_VERSION="$(awk '$1 == "oid" && $2 ~ /^sha256:/ { sub(/^sha256:/, "", $2); print $2; exit }' "$WAL_RUNNER_SOURCE")"
+if [ -z "$WAL_RUNNER_EXPECTED_VERSION" ]; then
+    command -v sha256sum >/dev/null 2>&1 || fail "sha256sum est nécessaire pour identifier l'archive GE-Proton"
+    WAL_RUNNER_EXPECTED_VERSION="$(sha256sum "$WAL_RUNNER_SOURCE" | awk '{ print $1 }')"
+fi
+case "$WAL_RUNNER_EXPECTED_VERSION" in
+    ''|*[!0-9a-f]*)
+        fail "identifiant SHA-256 invalide pour l'archive GE-Proton"
+        ;;
+esac
+[ "${#WAL_RUNNER_EXPECTED_VERSION}" -eq 64 ] \
+    || fail "identifiant SHA-256 invalide pour l'archive GE-Proton"
+
+if [ -x "$WAL_RUNNER/bin/wine" ] \
+    && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ] \
+    && [ -f "$WAL_RUNNER_VERSION_FILE" ] \
+    && [ "$(tr -d '\r\n' < "$WAL_RUNNER_VERSION_FILE")" = "$WAL_RUNNER_EXPECTED_VERSION" ]; then
+    ok "Runner GE-Proton à jour, téléchargement ignoré"
 else
+    if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
+        ok "Version GE-Proton différente ou inconnue, réinstallation requise"
+    fi
     WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-10-x86_64.tar.gz"
     if command -v curl >/dev/null 2>&1; then
         curl -fsL --retry 5 --retry-delay 2 -o "$WAL_RUNNER_ARCHIVE" "$WAL_RUNNER_URL" \
@@ -171,7 +194,10 @@ else
         fail "ni curl ni wget n'est disponible pour télécharger le runner GE-Proton"
     fi
     gzip -t "$WAL_RUNNER_ARCHIVE" || fail "archive GE-Proton invalide ou incomplète"
-    WAL_RUNNER_CUSTOM="$(dirname "$WAL_RUNNER")"
+    command -v sha256sum >/dev/null 2>&1 || fail "sha256sum est nécessaire pour vérifier l'archive GE-Proton"
+    WAL_RUNNER_ACTUAL_VERSION="$(sha256sum "$WAL_RUNNER_ARCHIVE" | awk '{ print $1 }')"
+    [ "$WAL_RUNNER_ACTUAL_VERSION" = "$WAL_RUNNER_EXPECTED_VERSION" ] \
+        || fail "l'archive GE-Proton téléchargée ne correspond pas à la version attendue"
     mkdir -p "$WAL_RUNNER_CUSTOM"
     # L'archive du dépôt contient déjà le dossier GE-Proton complet à sa racine.
     # On l'extrait donc directement dans wine/custom pour garder son arborescence.
@@ -182,6 +208,8 @@ else
         || fail "le runner extrait ne contient pas bin/wine exécutable dans $WAL_RUNNER"
     [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ] \
         || fail "le runner extrait ne contient pas lib/wine/x86_64-unix/wine exécutable dans $WAL_RUNNER"
+    printf '%s\n' "$WAL_RUNNER_EXPECTED_VERSION" > "$WAL_RUNNER_VERSION_FILE" \
+        || fail "enregistrement de la version GE-Proton impossible"
     ok "Runner GE-Proton téléchargé et installé dans $WAL_RUNNER"
 fi
 

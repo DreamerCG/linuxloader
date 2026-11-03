@@ -55,7 +55,7 @@ graphics: wine
 
 # The cabinet's 800x600 screen, scaled to the real one with its aspect kept.
 gamescope:
-  enabled: true
+  enabled: false
   width: 800
   height: 600
   args: [-S, fit, -f]
