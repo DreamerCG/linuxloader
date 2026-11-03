@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import sys
 from pathlib import Path
@@ -18,12 +17,9 @@ from batocera_launch.types import HotkeysContext
 from dcg_launch.gamescope_links import ensure_gamescope_links
 from dcg_launch.gamescope_options import (
     gamescope_args,
-    gamescope_config_values,
-    gamescope_profile,
+    gamescope_profile_details,
     wal_game_id,
 )
-
-_logger = logging.getLogger(__name__)
 
 # Windows arcade games (Taito Type X / X2, NESiCAxLive, ...) through the Windows arcade
 # loader: arcade-launcher runs the game in Wine with its system's I/O emulated (JVS board,
@@ -58,13 +54,6 @@ _logger = logging.getLogger(__name__)
 
 WAL_DIR: Final = Path("/userdata/system/dcg/emulators/windows-arcade-loader")
 WAL_CONFIG: Final = CONFIGS / "windows-arcade-loader"
-
-print(f" ===================================", file=sys.stderr)
-print(f" Lancement de Windows Arcade Loader Generator :", file=sys.stderr)
-print(f" WAL DIR : {WAL_DIR}", file=sys.stderr)
-print(f" WAL_CONFIG : {WAL_CONFIG}", file=sys.stderr)
-print(f" ===================================", file=sys.stderr)
-
 
 _GAMESCOPE_SWITCHES: Final = {"gamescope_hdr", "gamescope_hdr_itm_enabled"}
 
@@ -161,16 +150,18 @@ class WindowsArcadeLoader(Emulator):
         if keyboard in ("0", "1"):
             input_keys["keyboard_enabled"] = _yaml_scalar(keyboard == "1")
 
-        gamescope_config = gamescope_config_values(self.config)
-        configured_gamescope_backend = str(gamescope_config["gamescope_backend"] or "").lower()
+        configured_gamescope_backend = str(
+            self.config.get("gamescope_backend") or ""
+        ).lower()
         wayland_session = (
             bool(os.environ.get("WAYLAND_DISPLAY"))
             or os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
         )
-        profile_gamescope = gamescope_profile(
+        game_id = wal_game_id(self.rom)
+        profile_name, profile_gamescope = gamescope_profile_details(
             WAL_DIR,
             str(self.system),
-            wal_game_id(self.rom),
+            game_id,
         )
         profile_has_gamescope = bool(profile_gamescope and profile_gamescope[0])
         profile_args = profile_gamescope[1] if profile_gamescope else []
@@ -179,22 +170,6 @@ class WindowsArcadeLoader(Emulator):
             and wayland_session
             and profile_has_gamescope
         )
-        reported_backend = (
-            "ignored (profile has no gamescope section)"
-            if not profile_has_gamescope
-            else "sdl (automatic)"
-            if force_wayland_sdl
-            else configured_gamescope_backend or "auto"
-        )
-
-        print(
-            f"windows-arcade-loader: Gamescope configuration for {self.rom.name}:\n"
-            + "\n".join(f"  {key} = {value!r}" for key, value in gamescope_config.items())
-            + f"\n  wayland_session = {wayland_session}"
-            + f"\n  effective_backend = {reported_backend}",
-            file=sys.stderr,
-        )
-
         gamescope = self.config.get("gamescope")
         gamescope_options_set = force_wayland_sdl or any(
             str(self.config.get(key) or "") != ""
@@ -209,6 +184,8 @@ class WindowsArcadeLoader(Emulator):
         gamescope_keys: dict[str, str] = {}
         if gamescope in ("0", "1"):
             gamescope_keys["enabled"] = _yaml_scalar(gamescope == "1")
+        generated_gamescope_args: list[str] = []
+        needs_args_override = False
         if gamescope == "1":
             effective_backend = (
                 "sdl" if force_wayland_sdl else configured_gamescope_backend
@@ -229,7 +206,6 @@ class WindowsArcadeLoader(Emulator):
             needs_args_override = profile_has_gamescope and (
                 effective_backend in ("sdl", "drm") or args_options_set
             )
-            generated_gamescope_args: list[str] = []
             if needs_args_override:
                 if effective_backend in ("sdl", "drm"):
                     generated_gamescope_args.extend(["--backend", effective_backend])
@@ -242,38 +218,41 @@ class WindowsArcadeLoader(Emulator):
                 ))
             if needs_args_override:
                 gamescope_keys["args"] = json.dumps(generated_gamescope_args)
-                print(
-                    f"windows-arcade-loader: Gamescope arguments written for "
-                    f"{self.rom.name}: {generated_gamescope_args}",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    f"windows-arcade-loader: no Gamescope section in the WAL profile for "
-                    f"{self.rom.name}; backend and argument overrides are ignored"
-                    if not profile_args
-                    else f"windows-arcade-loader: Gamescope profile arguments preserved "
-                    f"for {self.rom.name}",
-                    file=sys.stderr,
-                )
-        elif force_wayland_sdl and gamescope == "0":
-            print(
-                f"windows-arcade-loader: Gamescope disabled by EmulationStation "
-                f"for {self.rom.name}; Wayland SDL backend will not override it",
-                file=sys.stderr,
-            )
-        elif gamescope == "0":
-            print(
-                f"windows-arcade-loader: Gamescope disabled by EmulationStation "
-                f"for {self.rom.name}",
-                file=sys.stderr,
-            )
-        else:
-            print(
-                f"windows-arcade-loader: no Gamescope arguments generated by "
-                f"EmulationStation for {self.rom.name}; game profile settings remain in effect",
-                file=sys.stderr,
-            )
+        controllers = [
+            f"P{controller.player_number}: "
+            f"{getattr(controller, 'real_name', '') or controller.name}"
+            + (f" ({controller.device_path})" if controller.device_path else "")
+            for controller in self.controllers
+        ]
+        gamescope_state = (
+            "not configured in profile"
+            if not profile_has_gamescope
+            else "disabled"
+            if gamescope == "0"
+            else "enabled"
+            if gamescope == "1"
+            else "profile defaults"
+        )
+        backend = (
+            "sdl" if force_wayland_sdl else configured_gamescope_backend or "auto"
+        ) if profile_has_gamescope else "profile default"
+        print(
+            "\n".join([
+                "=== Windows Arcade Loader ===",
+                f"  Jeu                 : {self.rom.name} (ID: {game_id})",
+                f"  Profil WAL          : {profile_name or 'introuvable'}",
+                f"  Gamescope           : {gamescope_state} (backend: {backend})",
+                f"  Arguments du profil : {profile_args}",
+                f"  Arguments ES        : "
+                f"{generated_gamescope_args if needs_args_override else []}",
+                f"  Contrôleurs reconnus ({len(controllers)}):",
+                *(
+                    [f"    {controller}" for controller in controllers]
+                    if controllers else ["    none"]
+                ),
+            ]),
+            file=sys.stderr,
+        )
 
         lines = [f"{key}: {value}" for key, value in top.items()]
         if input_keys:
@@ -288,7 +267,6 @@ class WindowsArcadeLoader(Emulator):
 
         layer = WAL_CONFIG / "es-options.yaml"
         layer.write_text("\n".join(lines) + "\n")
-        _logger.debug("windows-arcade-loader options %s:\n%s", layer, "\n".join(lines))
 
         command = [
             str(WAL_DIR / "arcade-launcher"),

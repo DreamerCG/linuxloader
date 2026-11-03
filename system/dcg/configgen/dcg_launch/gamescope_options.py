@@ -8,25 +8,6 @@ from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
-GAMESCOPE_CONFIG_KEYS = (
-    "gamescope",
-    "gamescope_backend",
-    "gamescope_output_resolution",
-    "gamescope_nested_resolution",
-    "gamescope_nested_refresh",
-    "gamescope_scaler",
-    "gamescope_filter",
-    "gamescope_sharpness",
-    "gamescope_hdr",
-    "gamescope_sdr_gamut_wideness",
-    "gamescope_hdr_sdr_content_nits",
-    "gamescope_hdr_itm_enabled",
-    "gamescope_hdr_itm_sdr_nits",
-    "gamescope_hdr_itm_target_nits",
-    "gamescope_windows_mode",
-    "gamescope_reshade_effect",
-)
-
 
 def _get_str(config: object, key: str) -> str:
     getter = getattr(config, "get_str", None)
@@ -53,11 +34,6 @@ def _get_value(config: object, key: str) -> object | None:
     raise TypeError(f"Unsupported Gamescope configuration type: {type(config).__name__}")
 
 
-def gamescope_config_values(config: object) -> dict[str, object | None]:
-    """Return all Gamescope settings consulted by the Windows Arcade Loader generator."""
-    return {key: _get_value(config, key) for key in GAMESCOPE_CONFIG_KEYS}
-
-
 def wal_game_id(rom: Path) -> str:
     """Return the game ID from its WindowsLoader marker, or the ROM name as a fallback."""
     if rom.is_dir():
@@ -78,12 +54,12 @@ def wal_game_id(rom: Path) -> str:
     return rom.stem
 
 
-def gamescope_profile(
+def gamescope_profile_details(
     wal_dir: Path,
     system: str,
     game_id: str,
-) -> tuple[bool, list[str]] | None:
-    """Return Gamescope section presence and args, resolving profile IDs or display names."""
+) -> tuple[str | None, tuple[bool, list[str]] | None]:
+    """Return the resolved WAL profile name and its Gamescope settings."""
     system_profiles_dir = wal_dir / "systemprofiles"
     system_profile_dir = system_profiles_dir / system
     profile_id = game_id
@@ -126,7 +102,7 @@ def gamescope_profile(
                 if score == best_score
             ]
         else:
-            return None
+            return None, None
 
         if len(best_matches) != 1:
             raise ValueError(
@@ -137,6 +113,7 @@ def gamescope_profile(
 
     has_gamescope = False
     args: list[str] = []
+    profile_name = profile_id
     for profile in (
         system_profile_dir / f"{profile_id}.yaml",
         wal_dir / "userprofiles" / system_profile_dir.name / f"{profile_id}.yaml",
@@ -147,6 +124,9 @@ def gamescope_profile(
             continue
 
         for index, line in enumerate(lines):
+            name_match = re.match(r"^\s*name:\s*(.*?)\s*(?:#.*)?$", line)
+            if name_match:
+                profile_name = name_match.group(1).strip().strip("\"'") or profile_id
             if line.strip() != "gamescope:":
                 continue
             has_gamescope = True
@@ -192,7 +172,17 @@ def gamescope_profile(
             else:
                 continue
             break
-    return has_gamescope, args
+    return profile_name, (has_gamescope, args)
+
+
+def gamescope_profile(
+    wal_dir: Path,
+    system: str,
+    game_id: str,
+) -> tuple[bool, list[str]] | None:
+    """Return Gamescope section presence and args, resolving profile IDs or display names."""
+    _, profile = gamescope_profile_details(wal_dir, system, game_id)
+    return profile
 
 
 def gamescope_args(
