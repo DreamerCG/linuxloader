@@ -337,7 +337,8 @@ for dir in \
     nesicax2 \
     rawthrills \
     typex \
-    typex2; do
+    typex2 \
+    globalvr; do
 
     path="$DEST/roms/$dir"
 
