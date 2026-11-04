@@ -12,8 +12,7 @@ gamescope:
   enabled: true
   width: 1280
   height: 480
-  args: [-S, fit, -f]
-  
+
 input:
   guns_enabled: true
   stick_as_dpad: false
