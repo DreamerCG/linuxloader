@@ -177,16 +177,28 @@ _PAD_TANK: Final = {
     'down': 'BUTTON_DOWN',
 }
 
-# Nirin: b (bottom face button) selects (its Enter), a (right) changes the
-# view, y (left) the transmission; L1/R1 (a wheel's paddles too) shift down
-# and up, which are player 2's down and up on the cabinet; up/down move in
-# the menus.
+# Nirin: b (bottom face button) is Enter (BUTTON_1), y (left) changes the
+# view (BUTTON_2), L1/R1 (a wheel's paddles too) shift up and down
+# (BUTTON_3, BUTTON_4); up/down move in the menus, L3 is the service button.
 _PAD_BIKE: Final = {
     'b': 'BUTTON_1',
-    'a': 'BUTTON_2',
-    'y': 'BUTTON_3',
+    'y': 'BUTTON_2',
+    'pageup': 'BUTTON_3',
+    'pagedown': 'BUTTON_4',
     'up': 'BUTTON_UP',
     'down': 'BUTTON_DOWN',
+}
+
+# Wangan Midnight Maximum Tune 4: b (bottom face button) is Enter
+# (BUTTON_1), y (left) changes the view (BUTTON_2), x (top) is the intrude
+# button (BUTTON_5); L1/R1 (a wheel's paddles too) shift down and up
+# (BUTTON_4, BUTTON_3), linuxloader working the cabinet's H shifter.
+_PAD_WMMT4: Final = {
+    'b': 'BUTTON_1',
+    'y': 'BUTTON_2',
+    'x': 'BUTTON_5',
+    'pageup': 'BUTTON_4',
+    'pagedown': 'BUTTON_3',
 }
 
 # L1/R1 (a wheel's paddles too) shift down and up in Dead Heat: player 2's
@@ -373,6 +385,9 @@ def _game_kind(rom: Path, /) -> str:
     # driving games; up/down are its volume buttons.
     if 'motogp' in re.sub(r'[^a-z]', '', name):
         return 'motogp'
+    # Wangan Midnight Maximum Tune 4 (Namco ES1): its own buttons and gears.
+    if re.search(r'(maximumtune|wmmt|wmn)4', re.sub(r'[^a-z0-9]', '', name)):
+        return 'wmmt4'
     # Wangan Midnight Maximum Tune 3 (Namco N2): wheel, pedals, view button.
     if 'wangan' in name or 'maximum tune' in name:
         return 'driving'
@@ -434,7 +449,7 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         if nplayer == 1 or not action.startswith('TEST'):
             _set(evdev, key, _pad_input(pad, name, digital=True))
 
-    if kind in ('driving', 'motogp', 'bike', 'deadheat', 'dhriders', 'tank'):
+    if kind in ('driving', 'motogp', 'bike', 'deadheat', 'dhriders', 'tank', 'wmmt4'):
         if nplayer != 1:
             return
         _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
@@ -466,6 +481,10 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             return
         if kind == 'bike':
             for name, action in _PAD_BIKE.items():
+                _set(evdev, player + action, _pad_input(pad, name, digital=True))
+            return
+        if kind == 'wmmt4':
+            for name, action in _PAD_WMMT4.items():
                 _set(evdev, player + action, _pad_input(pad, name, digital=True))
             return
         for name, action in (_WHEEL_DRIVING if wheel else _PAD_DRIVING).items():
@@ -647,6 +666,9 @@ class LinuxloaderGenerator(Generator):
             # The ELF links ESD but imports none of its symbols. Its empty
             # compatibility library must only be offered to this game.
             library_dirs.append(str(LINUXLOADER_DIR / 'ghostbusters'))
+        if kind == 'wmmt4':
+            # Its libcurl.so.4: a shim (linuxloader answers the servers).
+            library_dirs.append(str(LINUXLOADER_DIR / 'wmmt4'))
 
         # Libs supplémentaires uniquement pour Batocera 42
         if version == 42:
