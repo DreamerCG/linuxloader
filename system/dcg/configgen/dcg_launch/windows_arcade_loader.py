@@ -146,6 +146,11 @@ class WindowsArcadeLoader(Emulator):
             # the common crosshair option of the games able to show crosshairs
             env_keys['WAL_CROSSHAIR'] = _yaml_scalar(crosshair)
 
+        freeplay = self.config.get('wal_freeplay')
+        if freeplay in ('0', '1'):
+            # the common free play option (the loader's default: on)
+            env_keys['WAL_FREEPLAY'] = _yaml_scalar(freeplay)
+
         keyboard = self.config.get("wal_keyboard")
         if keyboard in ("0", "1"):
             input_keys["keyboard_enabled"] = _yaml_scalar(keyboard == "1")

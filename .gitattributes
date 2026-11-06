@@ -1,3 +1,6 @@
 system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz filter=lfs diff=lfs merge=lfs -text
 system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz filter=lfs diff=lfs merge=lfs -text
+system/dcg/emulators/windows-arcade-loader/wine-prefix/apm3-test.tar.gz filter=lfs diff=lfs merge=lfs -text
+system/dcg/emulators/windows-arcade-loader/wine-prefix/hog-wild.tar.gz filter=lfs diff=lfs merge=lfs -text
+system/dcg/emulators/windows-arcade-loader/wine-prefix/wasteland.tar.gz filter=lfs diff=lfs merge=lfs -text
 GE-Proton11-10-x86_64.tar.gz filter=lfs diff=lfs merge=lfs -text

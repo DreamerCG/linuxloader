@@ -10,6 +10,7 @@ set -e
 REPO_URL="${ARCHIVE_URL:-https://github.com/DreamerCG/linuxloader/archive/refs/heads/main.tar.gz}"
 WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz}"
 WAL_DOTNET11_URL="${WAL_DOTNET11_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz}"
+WAL_PREFIX_ARCHIVE_URL_BASE="${WAL_PREFIX_ARCHIVE_URL_BASE:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix}"
 WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/GE-Proton11-10-x86_64.tar.gz}"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
@@ -153,6 +154,33 @@ if [ "$USE_INSTALLED_WAL_DOTNET11" = 1 ]; then
 else
     resolve_lfs_archive "$WAL_DOTNET11" "$WAL_DOTNET11_URL" "l'archive du préfixe .NET 1.1"
 fi
+
+# Les autres préfixes sont versionnés comme full et dotnet11, et peuvent ainsi
+# réutiliser une archive déjà installée quand son contenu n'a pas changé.
+for prefix in apm3-test hog-wild wasteland; do
+    WAL_PREFIX_ARCHIVE="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.tar.gz"
+    INSTALLED_WAL_PREFIX_ARCHIVE="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.tar.gz"
+    WAL_PREFIX_ARCHIVE_VERSION="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.version"
+    INSTALLED_WAL_PREFIX_ARCHIVE_VERSION="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.version"
+    [ -f "$WAL_PREFIX_ARCHIVE_VERSION" ] \
+        || fail "fichier de version du préfixe Wine $prefix introuvable"
+    WAL_PREFIX_ARCHIVE_EXPECTED_VERSION="$(tr -d '\r\n' < "$WAL_PREFIX_ARCHIVE_VERSION")"
+    [ -n "$WAL_PREFIX_ARCHIVE_EXPECTED_VERSION" ] \
+        || fail "fichier de version du préfixe Wine $prefix vide"
+
+    if [ -f "$INSTALLED_WAL_PREFIX_ARCHIVE" ] \
+        && ! head -n 1 "$INSTALLED_WAL_PREFIX_ARCHIVE" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
+        && gzip -t "$INSTALLED_WAL_PREFIX_ARCHIVE" >/dev/null 2>&1 \
+        && [ -f "$INSTALLED_WAL_PREFIX_ARCHIVE_VERSION" ] \
+        && [ "$(tr -d '\r\n' < "$INSTALLED_WAL_PREFIX_ARCHIVE_VERSION")" = "$WAL_PREFIX_ARCHIVE_EXPECTED_VERSION" ]; then
+        cp -p "$INSTALLED_WAL_PREFIX_ARCHIVE" "$WAL_PREFIX_ARCHIVE" \
+            || fail "réutilisation de l'archive du préfixe Wine $prefix installée impossible"
+        ok "Archive du préfixe Wine $prefix à jour, téléchargement ignoré"
+    else
+        resolve_lfs_archive "$WAL_PREFIX_ARCHIVE" "$WAL_PREFIX_ARCHIVE_URL_BASE/$prefix.tar.gz" \
+            "l'archive du préfixe Wine $prefix"
+    fi
+done
 
 # Le runner GE-Proton 11-10 est stocké dans le dépôt Git LFS. L'extraction avec
 # tar préserve les permissions d'exécution nécessaires aux binaires Wine.
@@ -438,8 +466,14 @@ for f in \
     system/dcg/emulators/windows-arcade-loader/arcade-launcher \
     system/dcg/emulators/windows-arcade-loader/launcher.yaml \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/apm3-test.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/apm3-test.version \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.version \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/hog-wild.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/hog-wild.version \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/wasteland.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/wasteland.version \
     system/configs/emulationstation/es_systems_teknoparrot.cfg \
     system/configs/emulationstation/es_systems_nesicax.cfg \
     system/configs/emulationstation/es_systems_nesicax2.cfg \

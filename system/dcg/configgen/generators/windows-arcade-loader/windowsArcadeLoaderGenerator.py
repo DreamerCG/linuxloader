@@ -21,6 +21,8 @@ from dcg_launch.gamescope_options import (
 if TYPE_CHECKING:
     from configgen.types import HotkeysContext
 
+
+_logger = logging.getLogger(__name__)
 # Windows arcade games (Taito Type X / X2, NESiCAxLive, ...) through the Windows arcade
 # loader: arcade-launcher runs the game in Wine with its system's I/O emulated (JVS board,
 # NESiCA card reader...) and maps the pads, keyboards and guns itself (SDL and evdev), as
@@ -54,6 +56,7 @@ if TYPE_CHECKING:
 
 WAL_DIR: Final = Path('/userdata/system/dcg/emulators/windows-arcade-loader')
 WAL_CONFIG: Final = CONFIGS / 'windows-arcade-loader'
+
 
 _GAMESCOPE_SWITCHES: Final = {'gamescope_hdr', 'gamescope_hdr_itm_enabled'}
 
@@ -140,6 +143,10 @@ class WindowsArcadeLoaderGenerator(Generator):
         if crosshair in ('0', '1'):
             # the common crosshair option of the games able to show crosshairs
             env_keys['WAL_CROSSHAIR'] = _yaml_scalar(crosshair)
+        freeplay = system.config.get('wal_freeplay')
+        if freeplay in ('0', '1'):
+            # the common free play option (the loader's default: on)
+            env_keys['WAL_FREEPLAY'] = _yaml_scalar(freeplay)            
         keyboard = system.config.get('wal_keyboard')
         if keyboard in ('0', '1'):
             input_keys['keyboard_enabled'] = _yaml_scalar(keyboard == '1')
@@ -265,6 +272,7 @@ class WindowsArcadeLoaderGenerator(Generator):
             lines.extend(f'  {key}: {value}' for key, value in gamescope_keys.items())
         layer = WAL_CONFIG / 'es-options.yaml'
         layer.write_text('\n'.join(lines) + '\n')
+        _logger.debug('windows-arcade-loader options %s:\n%s', layer, '\n'.join(lines))        
 
         command = [str(WAL_DIR / 'arcade-launcher'), 'run', str(rom), '--root', str(WAL_DIR), '--profile', str(layer)]
         os.chdir(WAL_DIR)
