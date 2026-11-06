@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
 
 _logger = logging.getLogger(__name__)
+
 # Windows arcade games (Taito Type X / X2, NESiCAxLive, ...) through the Windows arcade
 # loader: arcade-launcher runs the game in Wine with its system's I/O emulated (JVS board,
 # NESiCA card reader...) and maps the pads, keyboards and guns itself (SDL and evdev), as
