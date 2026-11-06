@@ -1,0 +1,28 @@
+# Puyo Puyo e-Sports (Sega ALLS, APM3 edition; 64-bit). Runs puyoe.exe; its test mode is the
+# same program (the dump's gametest.bat), started again by the test switch.
+# Aime card: always on the reader (the game asks after START); the card input (F4, pad guide)
+# takes it off. The player's data in apms/gs-<aime id>.json of the game folder (the payload's
+# ABAAS game server).
+# Override values in userprofiles/apm3/puyo-puyo-e-sports.yaml.
+system: apm3
+name: Puyo Puyo e-Sports
+
+env:
+  WAL_APM3_TEST: puyoe.exe
+  # the test program is the game started again: marked by an argument the game ignores
+  WAL_APM3_TEST_ARGS: "-wal-test"
+  # ALL.Net, the Aime server and the game server up: Aime cards ("0" boots offline)
+  WAL_APM3_ONLINE: "1"
+  WAL_APM3_CARD_AUTO: "1"
+  # no ABAAS link server: the link built into the game (abaaslink ee20f2d) is never set up and
+  # the status shown counts it (network icon not green, "national / in-store versus unavailable"
+  # box): after the Aime server's check, the icon's status is green (0x14009f02b) and the box's
+  # link tests are skipped (0x14009ffbe): only ALL.Net and the Aime server decide
+  WAL_APM3_NO_LINK_PATCHES: "0x9f02b:418D5C2402EB26,0x9ffbe:84C0753341B701EB2E"
+
+input:
+  gamepad:
+    guide: card
+
+controls:
+  card: Aime card (take off / put back)
