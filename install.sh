@@ -315,6 +315,7 @@ for f in \
     "$DEST/system/configs/emulationstation/es_systems_konamipc.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_globalvr.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_adrenaline.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_namcoes3.cfg" \
     "$DEST/system/configs/emulationstation/es_features_linuxloader.cfg" \
     "$DEST/system/configs/emulationstation/es_features_windowsarcadeloader.cfg"; do
     [ -f "$f" ] && sed -i 's/\r$//' "$f"
@@ -368,6 +369,7 @@ for dir in \
     typex \
     typex2 \
     adrenaline \
+    namcoes3 \
     globalvr; do
 
     path="$DEST/roms/$dir"
@@ -481,6 +483,7 @@ for f in \
     system/configs/emulationstation/es_systems_typex.cfg \
     system/configs/emulationstation/es_systems_typex2.cfg \
     system/configs/emulationstation/es_systems_globalvr.cfg \
+    system/configs/emulationstation/es_systems_namcoes3.cfg \
     system/configs/emulationstation/es_systems_adrenaline.cfg \
     system/configs/emulationstation/es_features_linuxloader.cfg \
     system/configs/emulationstation/es_features_windowsarcadeloader.cfg; do
