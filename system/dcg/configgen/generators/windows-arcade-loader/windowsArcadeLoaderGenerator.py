@@ -137,21 +137,6 @@ class WindowsArcadeLoaderGenerator(Generator):
         if mouse_guns in ('0', '1'):
             input_keys['guns_mouse'] = _yaml_scalar(mouse_guns == '1')
         env_keys: dict[str, str] = {}
-        # Native Sinden frame: Batocera's system/game border settings, with an explicit
-        # loader override when chosen. Auto still gates activation on the game's gun profile.
-        border_mode = system.config.get('bordersmode') or 'auto'
-        if border_mode == 'auto':
-            border_mode = system.config.get('controllers.guns.bordersmode') or 'auto'
-        border = {'hidden': '0', 'force': '1'}.get(border_mode, 'auto')
-        override = system.config.get('wal_sinden_border')
-        if override in ('auto', '0', '1'):
-            border = override
-        env_keys['WAL_SINDEN_BORDER'] = json.dumps(border)
-        env_keys['WAL_SINDEN_BORDER_SIZE'] = json.dumps(str(system.config.get('wal_sinden_border_size') or system.config.get('controllers.guns.borderssize') or 'medium'))
-        env_keys['WAL_SINDEN_BORDER_COLOR'] = json.dumps(str(system.config.get('wal_sinden_border_color') or system.config.get('controllers.guns.borderscolor') or 'white'))
-        # The frontend knows virtual Sinden devices too; sysfs detection remains the fallback.
-        env_keys['WAL_SINDEN_DETECTED'] = json.dumps('1' if any(g.needs_borders for g in guns) else '0')        
-        
         keep_aspect = system.config.get('keep_aspect_ratio')
         if keep_aspect in ('on', 'off'):
             # games whose picture the payload scales to the screen (Gashaaaan)
