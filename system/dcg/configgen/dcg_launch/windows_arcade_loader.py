@@ -99,6 +99,10 @@ class WindowsArcadeLoader(Emulator):
         }
 
     @property
+    def handles_bezels(self) -> bool:
+        return self.config.get_bool("use_guns")
+
+    @property
     def execution_path(self) -> Path:
         return WAL_DIR
 
@@ -121,8 +125,9 @@ class WindowsArcadeLoader(Emulator):
         ensure_gamescope_links()
         WAL_CONFIG.mkdir(parents=True, exist_ok=True)
 
+        guns = list(self.guns)
         top: dict[str, str] = {}
-        input_keys: dict[str, str] = {}
+        input_keys: dict[str, str] = {"exit_combo": "[]"}
 
         reshade = self.config.get("wal_reshade")
         if reshade in ("0", "1"):
@@ -137,6 +142,31 @@ class WindowsArcadeLoader(Emulator):
             input_keys["guns_mouse"] = _yaml_scalar(mouse_guns == "1")
 
         env_keys: dict[str, str] = {}
+        # Native Sinden frame: Batocera's system/game border settings, with an explicit
+        # loader override when chosen. Auto still gates activation on the game's gun profile.
+        border_mode = self.config.get("bordersmode") or "auto"
+        if border_mode == "auto":
+            border_mode = self.config.get("controllers.guns.bordersmode") or "auto"
+        border = {"hidden": "0", "force": "1"}.get(border_mode, "auto")
+        override = self.config.get("wal_sinden_border")
+        if override in ("auto", "0", "1"):
+            border = override
+        env_keys["WAL_SINDEN_BORDER"] = _yaml_scalar(border)
+        env_keys["WAL_SINDEN_BORDER_SIZE"] = _yaml_scalar(
+            str(self.config.get("wal_sinden_border_size")
+                or self.config.get("controllers.guns.borderssize")
+                or "medium")
+        )
+        env_keys["WAL_SINDEN_BORDER_COLOR"] = _yaml_scalar(
+            str(self.config.get("wal_sinden_border_color")
+                or self.config.get("controllers.guns.borderscolor")
+                or "white")
+        )
+        # The frontend knows virtual Sinden devices too; sysfs detection remains the fallback.
+        env_keys["WAL_SINDEN_DETECTED"] = _yaml_scalar(
+            "1" if any(gun.needs_borders for gun in guns) else "0"
+        )
+
         keep_aspect = self.config.get("keep_aspect_ratio")
         if keep_aspect in ("on", "off"):
             env_keys["WAL_KEEP_ASPECT_RATIO"] = _yaml_scalar("1" if keep_aspect == "on" else "0")

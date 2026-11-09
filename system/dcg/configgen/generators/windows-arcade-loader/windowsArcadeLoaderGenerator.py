@@ -22,7 +22,6 @@ from dcg_launch.gamescope_options import (
 if TYPE_CHECKING:
     from configgen.types import HotkeysContext
 
-
 _logger = logging.getLogger(__name__)
 
 # Windows arcade games (Taito Type X / X2, NESiCAxLive, ...) through the Windows arcade
@@ -108,6 +107,13 @@ class WindowsArcadeLoaderGenerator(Generator):
     def writesToRom(self, config) -> bool:
         return True
 
+    # Gun games: the payload draws the Sinden frame itself (WAL_SINDEN_BORDER), so configgen
+    # draws neither its gun border overlay nor a MangoHUD bezel. Read after generate().
+    _guns_borders_internal = False
+
+    def supportsInternalBezels(self) -> bool:
+        return self._guns_borders_internal
+
     def generate(self, system, rom, playersControllers, metadata, guns, wheels, gameResolution):
         if configure_emulator(rom):
             os.chdir(WAL_DIR)
@@ -122,10 +128,13 @@ class WindowsArcadeLoaderGenerator(Generator):
 
         ensure_gamescope_links()
         mkdir_if_not_exists(WAL_CONFIG)
+        self._guns_borders_internal = bool(getattr(system.config, 'use_guns', False))
 
         # ES options -> profile keys (top level or under input:), set ones only.
         top: dict[str, str] = {}
-        input_keys: dict[str, str] = {}
+        # Batocera quits the game itself (hotkey + start: the hotkeys context's exit), no
+        # internal pad combo (back + start: coin + start on arcade panels with coin on select)
+        input_keys: dict[str, str] = {'exit_combo': '[]'}
         reshade = system.config.get('wal_reshade')
         if reshade in ('0', '1'):
             # rotation / bezel of the dumps that ship a ReShade setup (vertical games)
@@ -137,6 +146,20 @@ class WindowsArcadeLoaderGenerator(Generator):
         if mouse_guns in ('0', '1'):
             input_keys['guns_mouse'] = _yaml_scalar(mouse_guns == '1')
         env_keys: dict[str, str] = {}
+        # Native Sinden frame: Batocera's system/game border settings, with an explicit
+        # loader override when chosen. Auto still gates activation on the game's gun profile.
+        border_mode = system.config.get('bordersmode') or 'auto'
+        if border_mode == 'auto':
+            border_mode = system.config.get('controllers.guns.bordersmode') or 'auto'
+        border = {'hidden': '0', 'force': '1'}.get(border_mode, 'auto')
+        override = system.config.get('wal_sinden_border')
+        if override in ('auto', '0', '1'):
+            border = override
+        env_keys['WAL_SINDEN_BORDER'] = json.dumps(border)
+        env_keys['WAL_SINDEN_BORDER_SIZE'] = json.dumps(str(system.config.get('wal_sinden_border_size') or system.config.get('controllers.guns.borderssize') or 'medium'))
+        env_keys['WAL_SINDEN_BORDER_COLOR'] = json.dumps(str(system.config.get('wal_sinden_border_color') or system.config.get('controllers.guns.borderscolor') or 'white'))
+        # The frontend knows virtual Sinden devices too; sysfs detection remains the fallback.
+        env_keys['WAL_SINDEN_DETECTED'] = json.dumps('1' if any(g.needs_borders for g in guns) else '0')        
         keep_aspect = system.config.get('keep_aspect_ratio')
         if keep_aspect in ('on', 'off'):
             # games whose picture the payload scales to the screen (Gashaaaan)
@@ -274,7 +297,7 @@ class WindowsArcadeLoaderGenerator(Generator):
             lines.extend(f'  {key}: {value}' for key, value in gamescope_keys.items())
         layer = WAL_CONFIG / 'es-options.yaml'
         layer.write_text('\n'.join(lines) + '\n')
-        _logger.debug('windows-arcade-loader options %s:\n%s', layer, '\n'.join(lines))        
+        _logger.debug('windows-arcade-loader options %s:\n%s', layer, '\n'.join(lines))
 
         command = [str(WAL_DIR / 'arcade-launcher'), 'run', str(rom), '--root', str(WAL_DIR), '--profile', str(layer)]
         os.chdir(WAL_DIR)
