@@ -312,6 +312,7 @@ for f in \
     "$DEST/system/configs/emulationstation/es_systems_typex2.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_segare.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_segarw.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_segaalls.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_konamipc.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_globalvr.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_adrenaline.cfg" \
@@ -362,6 +363,7 @@ for dir in \
     teknoparrot \
     segare \
     segarw \
+    segaalls \
     konamipc \
     nesicax \
     nesicax2 \
@@ -483,6 +485,7 @@ for f in \
     system/configs/emulationstation/es_systems_typex.cfg \
     system/configs/emulationstation/es_systems_typex2.cfg \
     system/configs/emulationstation/es_systems_globalvr.cfg \
+    system/configs/emulationstation/es_systems_segaalls.cfg \
     system/configs/emulationstation/es_systems_namcoes3.cfg \
     system/configs/emulationstation/es_systems_adrenaline.cfg \
     system/configs/emulationstation/es_features_linuxloader.cfg \
