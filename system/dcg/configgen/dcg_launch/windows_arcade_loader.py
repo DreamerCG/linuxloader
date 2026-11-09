@@ -127,8 +127,9 @@ class WindowsArcadeLoader(Emulator):
 
         guns = list(self.guns)
         top: dict[str, str] = {}
-        input_keys: dict[str, str] = {"exit_combo": "[]"}
-
+        # input_keys: dict[str, str] = {"exit_combo": "[]"}
+        input_keys: dict[str, str] = {}
+        
         reshade = self.config.get("wal_reshade")
         if reshade in ("0", "1"):
             top["reshade"] = _yaml_scalar(reshade == "1")
