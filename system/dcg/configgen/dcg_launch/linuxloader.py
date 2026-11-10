@@ -69,6 +69,9 @@ _PAD_WOF: Final = {
     "b": "BUTTON_1", "a": "BUTTON_1", "left": "BUTTON_LEFT", "right": "BUTTON_RIGHT",
     "up": "BUTTON_UP", "down": "BUTTON_DOWN",
 }
+_PAD_THEACT: Final = {
+    "b": "BUTTON_1", "a": "BUTTON_1", "left": "BUTTON_LEFT", "right": "BUTTON_RIGHT",
+}
 _DIRECTIONS: Final = ("up", "down", "left", "right")
 _POINTER_BUTTONS: Final = {
     "BUTTON_1": ecodes.BTN_LEFT, "BUTTON_2": ecodes.BTN_RIGHT, "BUTTON_3": ecodes.BTN_MIDDLE,
@@ -157,6 +160,8 @@ def _game_kind(rom: Path, /) -> str:
     flat = re.sub(r"[^a-z]", "", name)
     if "halo" in name:
         return "halo"
+    if "theact" in flat:
+        return "theact"
     if "teenage mutant ninja turtles" in name or "tmnt" in name:
         return "tmnt"
     if "ghostbusters" in flat:
@@ -275,6 +280,12 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
         _set(evdev, f"ANALOGUE_{nplayer * 2 - 1}", _pad_input(pad, "joystick1left", digital=False))
         _set(evdev, f"ANALOGUE_{nplayer * 2}", _pad_input(pad, "joystick1up", digital=False))
         for name, action in _PAD_GHOSTBUSTERS.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == "theact":
+        if nplayer != 1:
+            return
+        _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
+        for name, action in _PAD_THEACT.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == "wof":
         if nplayer != 1:
@@ -406,6 +417,8 @@ class LinuxLoader(Emulator):
             game_dir = game_dir / "pm"
         if (game_dir / "System" / "armyops-bin").is_file():
             game_dir = game_dir / "System"
+        if (game_dir / "decaf" / "bin" / "decaf_Linux").is_file():
+            game_dir = game_dir / "decaf" / "bin"
         _fix_pt2_sound_daemon(game_dir)
 
         command = [str(LINUXLOADER_DIR / "linuxloader"), "-g", str(game_dir), "-c", str(config_file)]

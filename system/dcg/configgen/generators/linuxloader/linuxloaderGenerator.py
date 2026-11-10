@@ -64,9 +64,16 @@ _logger = logging.getLogger(__name__)
 # Dead Heat). Their buttons are their own (_PAD_DEADHEAT,
 # _PAD_DHRIDERS). Maximum Heat 3D (Dead Heat's later build) drives as Dead
 # Heat.
+# Wangan Midnight Maximum Tune 4 (WMN4r at the rom's top) drives as the
+# driving games (left stick or wheel, R2 gas, L2 brake), its buttons and
+# sequential gears its own (_PAD_WMMT4). Its libcurl (32-bit, absent from
+# Batocera) is a shim beside linuxloader (wmmt4/): linuxloader answers its
+# servers itself.
 #
-# The Teamplay games (Crossfire Maximum Paintball, Police Trainer 2) are gun
-# games, their dumps run through the host's dynamic linker by the loader.
+# The Teamplay games (Crossfire Maximum Paintball, Police Trainer 2, Star
+# Trek: Voyager) are gun games, their dumps run through the host's dynamic
+# linker by the loader. Star Trek: Voyager's service mode (its test switch)
+# is started by linuxloader in the game's place, and the game again after it.
 # Police Trainer 2 starts its sound daemon itself, "./pt2snd": a copy of the
 # dump that lost it (a symlink flattened into a file naming pt2snd.f7, the
 # daemon without its executable mode) is repaired before the game starts.
@@ -200,7 +207,6 @@ _PAD_WMMT4: Final = {
     'pageup': 'BUTTON_4',
     'pagedown': 'BUTTON_3',
 }
-
 # L1/R1 (a wheel's paddles too) shift down and up in Dead Heat: player 2's
 # down and up on the cabinet.
 _BIKE_SHIFT: Final = {'pageup': 'PLAYER_2_BUTTON_DOWN', 'pagedown': 'PLAYER_2_BUTTON_UP'}
@@ -257,6 +263,17 @@ _PAD_WOF: Final = {
     'right': 'BUTTON_RIGHT',
     'up': 'BUTTON_UP',
     'down': 'BUTTON_DOWN',
+}
+
+# The Act (Cecropia): the left stick turns the knob (ANALOGUE_1, as fast as
+# it is pushed; it stays where it is let go), the d-pad's left/right too; b
+# and a are its button, as Start is. A mouse turns it as well (the game reads
+# the pointer itself), and the keyboard's 1 and 5 are start and coin.
+_PAD_THEACT: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_1',
+    'left': 'BUTTON_LEFT',
+    'right': 'BUTTON_RIGHT',
 }
 
 _DIRECTIONS: Final = ('up', 'down', 'left', 'right')
@@ -366,6 +383,8 @@ def _game_kind(rom: Path, /) -> str:
     flat = re.sub(r'[^a-z]', '', name)
     if 'halo' in name:
         return 'halo'
+    if 'theact' in flat:
+        return 'theact'    
     if 'teenage mutant ninja turtles' in name or 'tmnt' in name:
         return 'tmnt'
     if 'ghostbusters' in re.sub(r'[^a-z]', '', name):
@@ -493,6 +512,12 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         _set(evdev, f'ANALOGUE_{nplayer * 2 - 1}', _pad_input(pad, 'joystick1left', digital=False))
         _set(evdev, f'ANALOGUE_{nplayer * 2}', _pad_input(pad, 'joystick1up', digital=False))
         for name, action in _PAD_GHOSTBUSTERS.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'theact':
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
+        for name, action in _PAD_THEACT.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == 'wof':
         if nplayer != 1:
@@ -650,6 +675,11 @@ class LinuxloaderGenerator(Generator):
         # America's Army (Global VR) runs from its System/ directory.
         if (game_dir / 'System' / 'armyops-bin').is_file():
             game_dir = game_dir / 'System'
+        # The Act (Cecropia) keeps the cabinet's ~/dist/decaf: it starts in
+        # bin/, its libraries (uClibc's names, FFmpeg 2006's, sqlite,
+        # sdl12-compat) in bin/lib.
+        if (game_dir / 'decaf' / 'bin' / 'decaf_Linux').is_file():
+            game_dir = game_dir / 'decaf' / 'bin'
         _fix_pt2_sound_daemon(game_dir)
         command = [str(LINUXLOADER_DIR / 'linuxloader'), '-g', str(game_dir), '-c', str(config_file)]
         if system.config.get_bool('linuxloader_test'):

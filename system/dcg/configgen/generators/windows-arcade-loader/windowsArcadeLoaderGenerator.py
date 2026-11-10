@@ -101,7 +101,7 @@ class WindowsArcadeLoaderGenerator(Generator):
         # Exit: the launcher stops the game and quits on SIGTERM. Coin: P1 coin (key 5).
         return {
             'name': 'windows-arcade-loader',
-            'keys': {'exit': '/usr/bin/pkill -TERM -x arcade-launcher', 'coin': 'KEY_5'},
+            'keys': {'exit': '/bin/pkill -TERM -x arcade-launcher', 'coin': 'KEY_5'},
         }
 
     def writesToRom(self, config) -> bool:
@@ -134,8 +134,8 @@ class WindowsArcadeLoaderGenerator(Generator):
         top: dict[str, str] = {}
         # Batocera quits the game itself (hotkey + start: the hotkeys context's exit), no
         # internal pad combo (back + start: coin + start on arcade panels with coin on select)
-        # input_keys: dict[str, str] = {'exit_combo': '[]'}
-        input_keys: dict[str, str] = {}
+        input_keys: dict[str, str] = {'exit_combo': '[]'}
+        #input_keys: dict[str, str] = {}
         reshade = system.config.get('wal_reshade')
         if reshade in ('0', '1'):
             # rotation / bezel of the dumps that ship a ReShade setup (vertical games)
@@ -160,7 +160,7 @@ class WindowsArcadeLoaderGenerator(Generator):
         env_keys['WAL_SINDEN_BORDER_SIZE'] = json.dumps(str(system.config.get('wal_sinden_border_size') or system.config.get('controllers.guns.borderssize') or 'medium'))
         env_keys['WAL_SINDEN_BORDER_COLOR'] = json.dumps(str(system.config.get('wal_sinden_border_color') or system.config.get('controllers.guns.borderscolor') or 'white'))
         # The frontend knows virtual Sinden devices too; sysfs detection remains the fallback.
-        env_keys['WAL_SINDEN_DETECTED'] = json.dumps('1' if any(g.needs_borders for g in guns) else '0')        
+        env_keys['WAL_SINDEN_DETECTED'] = json.dumps('1' if any(g.needs_borders for g in guns) else '0')
         keep_aspect = system.config.get('keep_aspect_ratio')
         if keep_aspect in ('on', 'off'):
             # games whose picture the payload scales to the screen (Gashaaaan)
@@ -172,7 +172,7 @@ class WindowsArcadeLoaderGenerator(Generator):
         freeplay = system.config.get('wal_freeplay')
         if freeplay in ('0', '1'):
             # the common free play option (the loader's default: on)
-            env_keys['WAL_FREEPLAY'] = _yaml_scalar(freeplay)            
+            env_keys['WAL_FREEPLAY'] = _yaml_scalar(freeplay)
         keyboard = system.config.get('wal_keyboard')
         if keyboard in ('0', '1'):
             input_keys['keyboard_enabled'] = _yaml_scalar(keyboard == '1')

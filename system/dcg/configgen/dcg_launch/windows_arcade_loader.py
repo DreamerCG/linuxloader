@@ -95,7 +95,7 @@ class WindowsArcadeLoader(Emulator):
     def hotkeygen_context(self) -> HotkeysContext:
         return {
             "name": "windows-arcade-loader",
-            "keys": {"exit": "/usr/bin/pkill -TERM -x arcade-launcher", "coin": "KEY_5"},
+            'keys': {'exit': '/bin/pkill -TERM -x arcade-launcher', 'coin': 'KEY_5'},
         }
 
     @property
@@ -127,8 +127,8 @@ class WindowsArcadeLoader(Emulator):
 
         guns = list(self.guns)
         top: dict[str, str] = {}
-        # input_keys: dict[str, str] = {"exit_combo": "[]"}
-        input_keys: dict[str, str] = {}
+        input_keys: dict[str, str] = {"exit_combo": "[]"}
+        #input_keys: dict[str, str] = {}
         
         reshade = self.config.get("wal_reshade")
         if reshade in ("0", "1"):
