@@ -30,22 +30,43 @@ ok()   { printf "  ${G}✔${N} %s\n" "$1"; }
 warn() { printf "  ${Y}!${N} %s\n" "$1"; }
 fail() { printf "\n${R}✘ ERREUR : %s${N}\n" "$1"; exit 1; }
 
+DOWNLOAD_ATTEMPTS=3
+
+# Télécharge une archive .tar.gz avec 3 tentatives (connexions instables).
+# Une tentative échoue aussi si le fichier reçu est un pointeur LFS ou un gzip tronqué.
+download_file() {
+    local url="$1" dest="$2" label="$3" attempt=1
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
+        || fail "ni curl ni wget n'est disponible pour télécharger $label"
+    while [ "$attempt" -le "$DOWNLOAD_ATTEMPTS" ]; do
+        rm -f "$dest"
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsL --retry 2 --retry-delay 2 --connect-timeout 20 -o "$dest" "$url" || rm -f "$dest"
+        else
+            wget -q -T 30 -O "$dest" "$url" || rm -f "$dest"
+        fi
+        if [ -f "$dest" ] \
+            && ! head -n 1 "$dest" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
+            && gzip -t "$dest" >/dev/null 2>&1; then
+            return 0
+        fi
+        rm -f "$dest"
+        if [ "$attempt" -lt "$DOWNLOAD_ATTEMPTS" ]; then
+            warn "Échec du téléchargement de $label (tentative $attempt/$DOWNLOAD_ATTEMPTS), nouvel essai dans $((attempt * 3))s..."
+            sleep $((attempt * 3))
+        fi
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
 resolve_lfs_archive() {
     local archive="$1" url="$2" label="$3"
     [ -f "$archive" ] || return 0
     if head -n 1 "$archive" | grep -qF 'version https://git-lfs.github.com/spec/v1'; then
         printf "  Récupération de %s stocké avec Git LFS...\n" "$label"
-        if command -v curl >/dev/null 2>&1; then
-            curl -fsL --retry 5 --retry-delay 2 -o "$archive" "$url" \
-                || fail "téléchargement LFS impossible : $label"
-        elif command -v wget >/dev/null 2>&1; then
-            wget -q -O "$archive" "$url" \
-                || fail "téléchargement LFS impossible : $label"
-        else
-            fail "ni curl ni wget n'est disponible pour télécharger $label via Git LFS"
-        fi
-        head -n 1 "$archive" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
-            && fail "GitHub a renvoyé le pointeur LFS au lieu de $label"
+        download_file "$url" "$archive" "$label" \
+            || fail "téléchargement LFS impossible après $DOWNLOAD_ATTEMPTS tentatives : $label"
         ok "$label téléchargé"
     fi
     gzip -t "$archive" || fail "archive invalide ou incomplète : $label"
@@ -70,15 +91,8 @@ printf "=========================================${N}\n"
 step "Téléchargement de l'archive"
 rm -rf "$WORK"
 mkdir -p "$WORK"
-if command -v curl >/dev/null 2>&1; then
-    curl -fsL --retry 5 --retry-delay 2 -o "$WORK/archive.tar.gz" "$REPO_URL" \
-        || fail "téléchargement impossible (vérifiez la connexion Internet)"
-elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$WORK/archive.tar.gz" "$REPO_URL" \
-        || fail "téléchargement impossible (vérifiez la connexion Internet)"
-else
-    fail "ni curl ni wget n'est disponible"
-fi
+download_file "$REPO_URL" "$WORK/archive.tar.gz" "l'archive du dépôt" \
+    || fail "téléchargement impossible après $DOWNLOAD_ATTEMPTS tentatives (vérifiez la connexion Internet)"
 SIZE="$(du -h "$WORK/archive.tar.gz" | cut -f1)"
 ok "Archive téléchargée ($SIZE)"
 
@@ -212,16 +226,8 @@ else
         ok "Version GE-Proton différente ou inconnue, réinstallation requise"
     fi
     WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-12-x86_64.tar.gz"
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsL --retry 5 --retry-delay 2 -o "$WAL_RUNNER_ARCHIVE" "$WAL_RUNNER_URL" \
-            || fail "téléchargement du runner GE-Proton impossible"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$WAL_RUNNER_ARCHIVE" "$WAL_RUNNER_URL" \
-            || fail "téléchargement du runner GE-Proton impossible"
-    else
-        fail "ni curl ni wget n'est disponible pour télécharger le runner GE-Proton"
-    fi
-    gzip -t "$WAL_RUNNER_ARCHIVE" || fail "archive GE-Proton invalide ou incomplète"
+    download_file "$WAL_RUNNER_URL" "$WAL_RUNNER_ARCHIVE" "le runner GE-Proton" \
+        || fail "téléchargement du runner GE-Proton impossible après $DOWNLOAD_ATTEMPTS tentatives"
     command -v sha256sum >/dev/null 2>&1 || fail "sha256sum est nécessaire pour vérifier l'archive GE-Proton"
     WAL_RUNNER_ACTUAL_VERSION="$(sha256sum "$WAL_RUNNER_ARCHIVE" | awk '{ print $1 }')"
     [ "$WAL_RUNNER_ACTUAL_VERSION" = "$WAL_RUNNER_EXPECTED_VERSION" ] \
