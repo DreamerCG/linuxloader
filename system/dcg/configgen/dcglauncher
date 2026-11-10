@@ -50,6 +50,8 @@ DCG_WINE_SYSTEMS = {
     'typex2',
     "segarw",
     "segare",
+    "segaalls",
+    "seganu",
     "konamipc",     
 }
 
