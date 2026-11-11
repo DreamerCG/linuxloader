@@ -47,6 +47,7 @@ def run_batocera_launch() -> None:
         "segare",
         "segaalls",
         "seganu",
+        "unis",
         "globalvr",        
         "adrenaline",        
         "konamipc",                        
