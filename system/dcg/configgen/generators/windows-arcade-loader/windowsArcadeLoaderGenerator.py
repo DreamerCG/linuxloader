@@ -135,7 +135,6 @@ class WindowsArcadeLoaderGenerator(Generator):
         # Batocera quits the game itself (hotkey + start: the hotkeys context's exit), no
         # internal pad combo (back + start: coin + start on arcade panels with coin on select)
         input_keys: dict[str, str] = {'exit_combo': '[]'}
-        #input_keys: dict[str, str] = {}
         reshade = system.config.get('wal_reshade')
         if reshade in ('0', '1'):
             # rotation / bezel of the dumps that ship a ReShade setup (vertical games)

@@ -106,6 +106,32 @@ _logger = logging.getLogger(__name__)
 # Guns and mice aim normally; a pad's left stick aims, b fires, a reloads
 # and y is the third gun button. Up/down navigate the operator menus.
 #
+# Gold Captain (IGS) is a ship shooter steered with a helm: the rom holds
+# GoldCaptain and its lib/ (the card reader's libraries), linuxloader stands
+# in for its PLX card and the IGS036 behind it (_PAD_GOLDCAPTAIN).
+# Pirate Revenge (IGS) is its predecessor: sship and its lib/, the same
+# helm, three buttons and two dodges (_PAD_PIRATEREVENGE).
+# Speed Driver (IGS) is a two-seat racing game: the rom holds TeknoRaven's
+# game/ (sdlinux, sd/, roms/ with its A27 board's ROM, lib_extra/ with IGS's
+# SDL_mixer). Each seat drives as the driving games (left stick or wheel,
+# R2 gas, L2 brake: ANALOGUE_1-3 seat 1, 4-6 seat 2), b turbo, x view,
+# L1/R1 gear down/up (_PAD_SPEEDDRIVER); seat 1's wheel gets the force
+# feedback. linuxloader shows seat 1's screen.
+# Rockin' Bowl-O-Rama (Cosmodog) is a trackball game: the rom is the
+# cabinet's /bowl (bowlgold). It runs on linuxloader's own input: the mouse
+# or a trackball rolls the ball, and the first pad (SDL) too, its left stick
+# the trackball, Start, Back coin, A replay, X scoresheet, Y jukebox, R3 the
+# operator menu, L3 a service credit. It draws at 640x480, scaled full
+# screen (a larger frame leaves old frames on the screen).
+# Temple Run (Coastal Amusements) is a FreeBSD game: the rom is its
+# directory (tr, its data, lib/ with a 32-bit OpenAL), run by
+# linuxloader_freebsd from there, not by linuxloader. Its I/O board reads
+# the keyboard and the first pad (SDL): d-pad or left stick turn, jump and
+# slide, A or Start start, Back coin, R3 the menu, Esc quits. The frame,
+# drawn for a portrait monitor, is turned upright unless the rotate option
+# is on (a monitor on its side). Both need SDL 1.2, which Batocera does not
+# carry: sdl12-compat's libSDL-1.2.so.0 beside linuxloader.
+#
 # World's Largest Pac-Man is a joystick title: no gun inputs are mapped, and
 # the d-pad or left stick controls its four directions.
 # TMNT has four independent joystick players and Page Up/Page Down volume.
@@ -276,6 +302,39 @@ _PAD_THEACT: Final = {
     'right': 'BUTTON_RIGHT',
 }
 
+# Gold Captain (IGS): the left stick (or a wheel) is the helm (ANALOGUE_1),
+# the d-pad's left/right turn it all the way; b is the left button (fire), a
+# the right one (start, confirm), as Start is.
+_PAD_GOLDCAPTAIN: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_2',
+    'left': 'BUTTON_LEFT',
+    'right': 'BUTTON_RIGHT',
+}
+
+# Pirate Revenge (IGS): the left stick (or a wheel) is the helm
+# (ANALOGUE_1), the d-pad's left/right turn it all the way (linuxloader turns
+# it no faster than the game's dodge); b and a are the left and right
+# buttons (fire), x the start button (special attack, confirm), as Start is;
+# l1/r1 dodge left/right (a fast turn of the helm).
+_PAD_PIRATEREVENGE: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_2',
+    'x': 'BUTTON_3',
+    'pageup': 'BUTTON_4',
+    'pagedown': 'BUTTON_5',
+    'left': 'BUTTON_LEFT',
+    'right': 'BUTTON_RIGHT',
+}
+
+# Speed Driver: per seat (PLAYER_n_).
+_PAD_SPEEDDRIVER: Final = {
+    'b': 'BUTTON_1',
+    'x': 'BUTTON_2',
+    'pageup': 'BUTTON_4',
+    'pagedown': 'BUTTON_5',
+}
+
 _DIRECTIONS: Final = ('up', 'down', 'left', 'right')
 
 # Mice and touchpads (a gamepad's too) aim like guns for the players left
@@ -384,7 +443,17 @@ def _game_kind(rom: Path, /) -> str:
     if 'halo' in name:
         return 'halo'
     if 'theact' in flat:
-        return 'theact'    
+        return 'theact'
+    if 'goldcaptain' in flat:
+        return 'goldcaptain'
+    if 'piraterevenge' in flat:
+        return 'piraterevenge'
+    if 'speeddriver' in flat:
+        return 'speeddriver'
+    if 'bowlorama' in flat:
+        return 'bowl'
+    if 'templerun' in flat:
+        return 'templerun'
     if 'teenage mutant ninja turtles' in name or 'tmnt' in name:
         return 'tmnt'
     if 'ghostbusters' in re.sub(r'[^a-z]', '', name):
@@ -519,6 +588,28 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
         for name, action in _PAD_THEACT.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'goldcaptain':
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
+        for name, action in _PAD_GOLDCAPTAIN.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'speeddriver':
+        # A seat per player, three analogue channels each.
+        if nplayer > 2:
+            return
+        first = (nplayer - 1) * 3
+        _set(evdev, f'ANALOGUE_{first + 1}', _pad_input(pad, 'joystick1left', digital=False))
+        _set(evdev, f'ANALOGUE_{first + 2}', _pad_input(pad, 'r2', digital=False))
+        _set(evdev, f'ANALOGUE_{first + 3}', _pad_input(pad, 'l2', digital=False))
+        for name, action in _PAD_SPEEDDRIVER.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'piraterevenge':
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
+        for name, action in _PAD_PIRATEREVENGE.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == 'wof':
         if nplayer != 1:
             return
@@ -564,6 +655,26 @@ class LinuxloaderGenerator(Generator):
     def getInGameRatio(self, config, gameResolution, rom):
         return 16 / 9
 
+    def _temple_run(self, system, game_dir: Path, playersControllers, /) -> Command.Command:
+        """Temple Run: linuxloader_freebsd runs tr from its directory."""
+        os.chdir(game_dir)
+        return Command.Command(
+            array=[str(LINUXLOADER_DIR / 'linuxloader_freebsd'), './tr'],
+            env={
+                # Its lib/ (OpenAL) first, sdl12-compat beside linuxloader.
+                'LD_LIBRARY_PATH': ':'.join(
+                    [str(game_dir / 'lib'), '/lib32/pulseaudio', '/lib32', '/lib32/extralibs', str(LINUXLOADER_DIR)]
+                ),
+                'LIBGL_DRIVERS_PATH': '/lib32/dri:/usr/lib/dri',
+                'SPA_PLUGIN_DIR': '/lib32/spa-0.2:/usr/lib/spa-0.2',
+                'PIPEWIRE_MODULE_DIR': '/lib32/pipewire-0.3:/usr/lib/pipewire-0.3',
+                # Upright on a landscape screen; as drawn on a monitor on its side.
+                'FBSD_ROTATE': '' if system.config.get_bool('linuxloader_rotate') else 'ccw',
+                'SDL_GAMECONTROLLERCONFIG': generate_sdl_game_controller_config(playersControllers),
+                'SDL_JOYSTICK_HIDAPI': '0',
+            },
+        )
+
     def generate(self, system, rom, playersControllers, metadata, guns, wheels, gameResolution):
         game_dir = rom if rom.is_dir() else rom.parent
         # A .squashfs rom arrives as its overlay mount, named after the image.
@@ -589,6 +700,9 @@ class LinuxloaderGenerator(Generator):
             'EVDEV': {},
         }
         evdev = conf['EVDEV']
+        # Rockin' Bowl-O-Rama: its own 640x480, scaled to the screen.
+        if kind == 'bowl':
+            conf['Display'].update({'WIDTH': '640', 'HEIGHT': '480', 'FULLSCREEN': '1'})
         # Big Buck Pro uses a GLUT window in place of its cabinet game mode.
         if _is_nerf(rom) or 'bigbuckhunterpro' in re.sub(r'[^a-z]', '', rom.name.lower()):
             conf['Display']['FULLSCREEN'] = '1'
@@ -648,7 +762,9 @@ class LinuxloaderGenerator(Generator):
                 _logger.debug('linuxloader: player %s aims with %s (%s)', nplayer, node, axis)
 
         # Pads (and wheels, driving the same way): the players without a gun.
-        for nplayer, pad in enumerate(playersControllers[:max_players], start=1):
+        # Rockin' Bowl-O-Rama reads them itself (its trackball is the left
+        # stick, which evdev mode does not turn into a trackball).
+        for nplayer, pad in enumerate(playersControllers[:max_players] if kind != 'bowl' else [], start=1):
             if nplayer > gun_players:
                 wheel = system.config.use_wheels and pad.device_path in wheels
                 _setup_pad(evdev, kind, nplayer, pad, wheel=wheel)
@@ -680,7 +796,12 @@ class LinuxloaderGenerator(Generator):
         # sdl12-compat) in bin/lib.
         if (game_dir / 'decaf' / 'bin' / 'decaf_Linux').is_file():
             game_dir = game_dir / 'decaf' / 'bin'
+        # Speed Driver: TeknoRaven's game/ (sdlinux and its lib_extra/).
+        if (game_dir / 'game' / 'sdlinux').is_file():
+            game_dir = game_dir / 'game'
         _fix_pt2_sound_daemon(game_dir)
+        if kind == 'templerun' and (game_dir / 'tr').is_file():
+            return self._temple_run(system, game_dir, playersControllers)
         command = [str(LINUXLOADER_DIR / 'linuxloader'), '-g', str(game_dir), '-c', str(config_file)]
         if system.config.get_bool('linuxloader_test'):
             command.append('-t')
@@ -691,7 +812,8 @@ class LinuxloaderGenerator(Generator):
         print("Debug command :", command, file=sys.stderr)        
 
         library_dirs = ['/lib32/pulseaudio', '/lib32', '/lib32/extralibs', str(game_dir / 'lib')]
-        
+        if kind == 'speeddriver':
+            library_dirs.append(str(game_dir / 'lib_extra'))
         if kind == 'ghostbusters':
             # The ELF links ESD but imports none of its symbols. Its empty
             # compatibility library must only be offered to this game.

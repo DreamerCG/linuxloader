@@ -72,6 +72,17 @@ _PAD_WOF: Final = {
 _PAD_THEACT: Final = {
     "b": "BUTTON_1", "a": "BUTTON_1", "left": "BUTTON_LEFT", "right": "BUTTON_RIGHT",
 }
+_PAD_GOLDCAPTAIN: Final = {
+    "b": "BUTTON_1", "a": "BUTTON_2", "left": "BUTTON_LEFT", "right": "BUTTON_RIGHT",
+}
+_PAD_PIRATEREVENGE: Final = {
+    "b": "BUTTON_1", "a": "BUTTON_2", "x": "BUTTON_3",
+    "pageup": "BUTTON_4", "pagedown": "BUTTON_5",
+    "left": "BUTTON_LEFT", "right": "BUTTON_RIGHT",
+}
+_PAD_SPEEDDRIVER: Final = {
+    "b": "BUTTON_1", "x": "BUTTON_2", "pageup": "BUTTON_4", "pagedown": "BUTTON_5",
+}
 _DIRECTIONS: Final = ("up", "down", "left", "right")
 _POINTER_BUTTONS: Final = {
     "BUTTON_1": ecodes.BTN_LEFT, "BUTTON_2": ecodes.BTN_RIGHT, "BUTTON_3": ecodes.BTN_MIDDLE,
@@ -162,6 +173,16 @@ def _game_kind(rom: Path, /) -> str:
         return "halo"
     if "theact" in flat:
         return "theact"
+    if "goldcaptain" in flat:
+        return "goldcaptain"
+    if "piraterevenge" in flat:
+        return "piraterevenge"
+    if "speeddriver" in flat:
+        return "speeddriver"
+    if "bowlorama" in flat:
+        return "bowl"
+    if "templerun" in flat:
+        return "templerun"
     if "teenage mutant ninja turtles" in name or "tmnt" in name:
         return "tmnt"
     if "ghostbusters" in flat:
@@ -235,7 +256,16 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
         if nplayer == 1 or not action.startswith("TEST"):
             _set(evdev, key, _pad_input(pad, name, digital=True))
 
-    if kind in ("driving", "motogp", "bike", "deadheat", "dhriders", "tank", "wmmt4"):
+    if kind == "speeddriver":
+        if nplayer > 2:
+            return
+        first = (nplayer - 1) * 3
+        _set(evdev, f"ANALOGUE_{first + 1}", _pad_input(pad, "joystick1left", digital=False))
+        _set(evdev, f"ANALOGUE_{first + 2}", _pad_input(pad, "r2", digital=False))
+        _set(evdev, f"ANALOGUE_{first + 3}", _pad_input(pad, "l2", digital=False))
+        for name, action in _PAD_SPEEDDRIVER.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind in ("driving", "motogp", "bike", "deadheat", "dhriders", "tank", "wmmt4"):
         if nplayer != 1:
             return
         _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
@@ -286,6 +316,18 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
             return
         _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
         for name, action in _PAD_THEACT.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == "goldcaptain":
+        if nplayer != 1:
+            return
+        _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
+        for name, action in _PAD_GOLDCAPTAIN.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == "piraterevenge":
+        if nplayer != 1:
+            return
+        _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
+        for name, action in _PAD_PIRATEREVENGE.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
     elif kind == "wof":
         if nplayer != 1:
@@ -352,6 +394,8 @@ class LinuxLoader(Emulator):
             "EVDEV": {},
         }
         evdev = conf["EVDEV"]
+        if kind == "bowl":
+            conf["Display"].update({"WIDTH": "640", "HEIGHT": "480", "FULLSCREEN": "1"})
         guns_enabled = self.config.get_bool("use_guns")
         guns = list(self.guns)
         controllers = list(self.controllers)
@@ -392,7 +436,8 @@ class LinuxLoader(Emulator):
                         if code in keys:
                             evdev.setdefault(f"PLAYER_{nplayer}_{action}", f"{node}:KEY:{code}")
 
-        for nplayer, pad in enumerate(controllers[:max_players], start=1):
+        pads = [] if kind == "bowl" else controllers[:max_players]
+        for nplayer, pad in enumerate(pads, start=1):
             if nplayer > gun_players:
                 _setup_pad(
                     evdev,
@@ -419,7 +464,27 @@ class LinuxLoader(Emulator):
             game_dir = game_dir / "System"
         if (game_dir / "decaf" / "bin" / "decaf_Linux").is_file():
             game_dir = game_dir / "decaf" / "bin"
+        if (game_dir / "game" / "sdlinux").is_file():
+            game_dir = game_dir / "game"
         _fix_pt2_sound_daemon(game_dir)
+
+        if kind == "templerun" and (game_dir / "tr").is_file():
+            os.chdir(game_dir)
+            return Command(
+                args=[str(LINUXLOADER_DIR / "linuxloader_freebsd"), "./tr"],
+                env={
+                    "LD_LIBRARY_PATH": ":".join([
+                        str(game_dir / "lib"), "/lib32/pulseaudio", "/lib32",
+                        "/lib32/extralibs", str(LINUXLOADER_DIR),
+                    ]),
+                    "LIBGL_DRIVERS_PATH": "/lib32/dri:/usr/lib/dri",
+                    "SPA_PLUGIN_DIR": "/lib32/spa-0.2:/usr/lib/spa-0.2",
+                    "PIPEWIRE_MODULE_DIR": "/lib32/pipewire-0.3:/usr/lib/pipewire-0.3",
+                    "FBSD_ROTATE": "" if self.config.get_bool("linuxloader_rotate") else "ccw",
+                    "SDL_GAMECONTROLLERCONFIG": generate_sdl_game_controller_config(controllers),
+                    "SDL_JOYSTICK_HIDAPI": "0",
+                },
+            )
 
         command = [str(LINUXLOADER_DIR / "linuxloader"), "-g", str(game_dir), "-c", str(config_file)]
         if self.config.get_bool("linuxloader_test"):
@@ -427,6 +492,8 @@ class LinuxLoader(Emulator):
 
         version = _detect_batocera_version()
         library_dirs = ["/lib32/pulseaudio", "/lib32", "/lib32/extralibs", str(game_dir / "lib")]
+        if kind == "speeddriver":
+            library_dirs.append(str(game_dir / "lib_extra"))
         if kind == "ghostbusters":
             library_dirs.append(str(LINUXLOADER_DIR / "ghostbusters"))
         if kind == "wmmt4":
