@@ -30,7 +30,7 @@ ok()   { printf "  ${G}✔${N} %s\n" "$1"; }
 warn() { printf "  ${Y}!${N} %s\n" "$1"; }
 fail() { printf "\n${R}✘ ERREUR : %s${N}\n" "$1"; exit 1; }
 
-DOWNLOAD_ATTEMPTS=3
+DOWNLOAD_ATTEMPTS=10
 
 # Télécharge une archive .tar.gz avec 3 tentatives (connexions instables).
 # Une tentative échoue aussi si le fichier reçu est un pointeur LFS ou un gzip tronqué.
