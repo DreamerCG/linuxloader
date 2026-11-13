@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import subprocess
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
