@@ -39,7 +39,7 @@ hide: [dxgi.dll, ReShade.ini, dinput.dll, dinput_backend.dll, Xidi.ini, installe
 
 env:
   WAL_ARCADEPC_BOARD: segarally2
-  WAL_SR2_ASPECT: "16_9"
+  WAL_SR2_ASPECT: "16:9"
   WAL_DINPUT_WHEEL: Sega Rally 2 Wheel
   # MGInput.dll takes DirectInput 5-7 device types only
   WAL_DINPUT_LEGACY: "1"

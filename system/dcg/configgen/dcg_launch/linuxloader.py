@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Final
 
@@ -83,6 +84,20 @@ _PAD_PIRATEREVENGE: Final = {
 _PAD_SPEEDDRIVER: Final = {
     "b": "BUTTON_1", "x": "BUTTON_2", "pageup": "BUTTON_4", "pagedown": "BUTTON_5",
 }
+
+# Speed Driver 2, 3 and 4 (one seat): BUTTON_4 is their gear up, BUTTON_5 down.
+_PAD_SPEEDDRIVER234: Final = {
+    "b": "BUTTON_1",
+    "x": "BUTTON_2",
+    "pageup": "BUTTON_5",
+    "pagedown": "BUTTON_4",
+}
+
+# Speed Rider 1 and 2: BUTTON_1 is the bike's start/turbo button.
+_PAD_SPEEDRIDER: Final = {
+    "b": "BUTTON_1",
+}
+
 _DIRECTIONS: Final = ("up", "down", "left", "right")
 _POINTER_BUTTONS: Final = {
     "BUTTON_1": ecodes.BTN_LEFT, "BUTTON_2": ecodes.BTN_RIGHT, "BUTTON_3": ecodes.BTN_MIDDLE,
@@ -147,6 +162,31 @@ def _pointers(guns: list, /) -> list[tuple[str, str, set[int]]]:
     return [(node, axis, keys) for _, _, node, axis, keys in sorted(found)]
 
 
+def _flattened_links(kind: str, dirs: list[Path], /) -> Path | None:
+    """Links to the libraries whose symlinks an archive flattened into small
+    files holding their target's name, in a directory of their own (the
+    rom may be a read-only squashfs)."""
+    links = Path('/tmp') / f'linuxloader-{kind}-libs'
+    shutil.rmtree(links, ignore_errors=True)
+    made = False
+    for directory in dirs:
+        for path in directory.glob('*.so*'):
+            try:
+                if path.is_symlink() or not path.is_file() or path.stat().st_size >= 128:
+                    continue
+                target = path.read_text(errors='replace').strip()
+                if not target or '/' in target or not (directory / target).is_file():
+                    continue
+                links.mkdir(parents=True, exist_ok=True)
+                link = links / path.name
+                if not link.exists():
+                    link.symlink_to(directory / target)
+                    made = True
+            except OSError as e:
+                _logger.warning('linuxloader: cannot link %s (%s)', path, e)
+    return links if made else None
+
+
 def _fix_pt2_sound_daemon(game_dir: Path, /) -> None:
     link = game_dir / "pt2snd"
     if not (game_dir / "pt2s_g11").is_file() or not link.exists():
@@ -168,7 +208,7 @@ def _fix_pt2_sound_daemon(game_dir: Path, /) -> None:
 
 def _game_kind(rom: Path, /) -> str:
     name = rom.name.lower()
-    flat = re.sub(r"[^a-z]", "", name)
+    flat = re.sub(r"[^a-z0-9]", "", name)
     if "halo" in name:
         return "halo"
     if "theact" in flat:
@@ -177,6 +217,12 @@ def _game_kind(rom: Path, /) -> str:
         return "goldcaptain"
     if "piraterevenge" in flat:
         return "piraterevenge"
+    if re.search(r'speeddriver[234]', re.sub(r'[^a-z0-9]', '', name)):
+        return 'speeddriver234'
+    if 'powertruck' in flat:
+        return 'speeddriver234'
+    if 'speedrider' in flat:
+        return 'speedrider'
     if "speeddriver" in flat:
         return "speeddriver"
     if "bowlorama" in flat:
@@ -265,6 +311,16 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
         _set(evdev, f"ANALOGUE_{first + 3}", _pad_input(pad, "l2", digital=False))
         for name, action in _PAD_SPEEDDRIVER.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind in ('speeddriver234', 'speedrider'):
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
+        _set(evdev, 'ANALOGUE_2', _pad_input(pad, 'r2', digital=False))
+        _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'l2', digital=False))
+        for name, action in (_PAD_SPEEDDRIVER234 if kind == 'speeddriver234' else _PAD_SPEEDRIDER).items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+        for direction in _DIRECTIONS:
+            _set(evdev, player + 'BUTTON_' + direction.upper(), _pad_input(pad, direction, digital=True))
     elif kind in ("driving", "motogp", "bike", "deadheat", "dhriders", "tank", "wmmt4"):
         if nplayer != 1:
             return
@@ -466,6 +522,13 @@ class LinuxLoader(Emulator):
             game_dir = game_dir / "decaf" / "bin"
         if (game_dir / "game" / "sdlinux").is_file():
             game_dir = game_dir / "game"
+        # Speed Driver 3/4, Speed Rider, Power Truck: their game/ (sd3;
+        # olympus, the cabinet's /SD4/readwrite beside ../data; SR; pt).
+        elif any((game_dir / "game" / exe).is_file() for exe in ("sd3", "olympus", "SR", "pt")):
+            game_dir = game_dir / "game"
+        # Speed Rider 2: game/bin_linux beside ../data.
+        elif (game_dir / "game" / "bin_linux" / "speedrider2").is_file():
+            game_dir = game_dir / "game" / "bin_linux"
         _fix_pt2_sound_daemon(game_dir)
 
         if kind == "templerun" and (game_dir / "tr").is_file():
@@ -494,6 +557,18 @@ class LinuxLoader(Emulator):
         library_dirs = ["/lib32/pulseaudio", "/lib32", "/lib32/extralibs", str(game_dir / "lib")]
         if kind == "speeddriver":
             library_dirs.append(str(game_dir / "lib_extra"))
+        if kind in ('speeddriver234', 'speedrider'):
+            # lib/ before Batocera's: its libpcsclite.so.1 is a stub without
+            # the SCardCancelTransaction/SCardSetTimeout libcasmcard links.
+            library_dirs.remove(str(game_dir / 'lib'))
+            library_dirs.insert(0, str(game_dir / 'lib'))
+            # Their libraries beside the ELF (Ogre, Scaleform, Cg...), in
+            # libso/ and lib_extra/, their flattened links first.
+            dirs = [game_dir] + [game_dir / d for d in ('libso', 'lib_extra') if (game_dir / d).is_dir()]
+            links = _flattened_links(kind, dirs)
+            if links:
+                library_dirs.insert(0, str(links))
+            library_dirs.extend(str(d) for d in dirs)
         if kind == "ghostbusters":
             library_dirs.append(str(LINUXLOADER_DIR / "ghostbusters"))
         if kind == "wmmt4":
