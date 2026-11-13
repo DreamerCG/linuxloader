@@ -48,6 +48,7 @@ def run_batocera_launch() -> None:
         "segaalls",
         "seganu",
         "unis",
+        "exaarcadia",
         "globalvr",        
         "adrenaline",        
         "konamipc",                        
