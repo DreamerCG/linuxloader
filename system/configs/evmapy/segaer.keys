@@ -1,0 +1,36 @@
+{
+    "actions_player1": [
+		{
+            "trigger": [
+                "hotkey",
+                "start"
+            ],			
+            "type": "key",
+            "target": ["KEY_EXIT"],
+            "description": "Exit emulator"		
+		}
+    ],
+    "actions_player2": [
+		{
+            "trigger": [
+                "hotkey",
+                "start"
+            ],			
+            "type": "key",
+            "target": ["KEY_EXIT"],
+            "description": "Exit emulator"		
+		}
+    ],
+    "actions_gun1": [
+        {
+            "trigger": ["left", "right", "middle"],
+            "type": "key",
+            "hold": 2.0,
+            "target": ["KEY_EXIT"],
+            "description": "Exit emulator"
+        }
+    ]
+}
+
+
+
