@@ -318,6 +318,7 @@ for f in \
     "$DEST/system/configs/emulationstation/es_systems_typex2.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_segare.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_segarw.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_segaer.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_segaalls.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_seganu.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_unis.cfg" \
@@ -371,6 +372,7 @@ for dir in \
     teknoparrot \
     segare \
     segarw \
+    segaer \
     segaalls \
     seganu \
     konamipc \
@@ -496,6 +498,7 @@ for f in \
     system/configs/emulationstation/es_systems_typex2.cfg \
     system/configs/emulationstation/es_systems_globalvr.cfg \
     system/configs/emulationstation/es_systems_segare.cfg \
+    system/configs/emulationstation/es_systems_segaer.cfg \
     system/configs/emulationstation/es_systems_segarw.cfg \
     system/configs/emulationstation/es_systems_segaalls.cfg \
     system/configs/emulationstation/es_systems_seganu.cfg \
