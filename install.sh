@@ -322,6 +322,7 @@ for f in \
     "$DEST/system/configs/emulationstation/es_systems_segaalls.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_seganu.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_unis.cfg" \
+    "$DEST/system/configs/emulationstation/es_systems_gaelco.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_konamipc.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_globalvr.cfg" \
     "$DEST/system/configs/emulationstation/es_systems_adrenaline.cfg" \
@@ -377,6 +378,7 @@ for dir in \
     seganu \
     konamipc \
     nesicax \
+    gaelco \
     nesicax2 \
     unis \
     rawthrills \
@@ -498,6 +500,7 @@ for f in \
     system/configs/emulationstation/es_systems_typex2.cfg \
     system/configs/emulationstation/es_systems_globalvr.cfg \
     system/configs/emulationstation/es_systems_segare.cfg \
+    system/configs/emulationstation/es_systems_gaelco.cfg \
     system/configs/emulationstation/es_systems_segaer.cfg \
     system/configs/emulationstation/es_systems_segarw.cfg \
     system/configs/emulationstation/es_systems_segaalls.cfg \
