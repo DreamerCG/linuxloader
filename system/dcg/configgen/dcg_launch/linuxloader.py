@@ -98,6 +98,15 @@ _PAD_SPEEDRIDER: Final = {
     "b": "BUTTON_1",
 }
 
+# Gaelco: b the view, y the siren (Tokyo Cop), R1/L1 the gear up/down
+# (Tuning Race: player 2's up and down, the driving games' gears).
+_PAD_GAELCO: Final = {
+    'b': 'BUTTON_2',
+    'y': 'BUTTON_1',
+    'pagedown': 'PLAYER_2_BUTTON_UP',
+    'pageup': 'PLAYER_2_BUTTON_DOWN',
+}
+
 _DIRECTIONS: Final = ("up", "down", "left", "right")
 _POINTER_BUTTONS: Final = {
     "BUTTON_1": ecodes.BTN_LEFT, "BUTTON_2": ecodes.BTN_RIGHT, "BUTTON_3": ecodes.BTN_MIDDLE,
@@ -227,8 +236,14 @@ def _game_kind(rom: Path, /) -> str:
         return "speeddriver"
     if "bowlorama" in flat:
         return "bowl"
+    if "gogostrike" in flat:
+        return "gogostrike"
+    if "orangecountychoppers" in flat or "occpinball" in flat:
+        return "occpinball"
     if "templerun" in flat:
         return "templerun"
+    if "tokyocop" in flat or "ringriders" in flat or "ringraiders" in flat or "tuningrace" in flat:
+        return "gaelco"
     if "teenage mutant ninja turtles" in name or "tmnt" in name:
         return "tmnt"
     if "ghostbusters" in flat:
@@ -379,6 +394,15 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
         _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
         for name, action in _PAD_GOLDCAPTAIN.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == "gaelco":
+        if nplayer != 1:
+            return
+        _set(evdev, "ANALOGUE_1", _pad_input(pad, "joystick1left", digital=False))
+        _set(evdev, "ANALOGUE_2", _pad_input(pad, "r2", digital=False))
+        _set(evdev, "ANALOGUE_3", _pad_input(pad, "l2", digital=False))
+        for name, action in _PAD_GAELCO.items():
+            key = action if action.startswith("PLAYER_") else player + action
+            _set(evdev, key, _pad_input(pad, name, digital=True))
     elif kind == "piraterevenge":
         if nplayer != 1:
             return
@@ -452,6 +476,13 @@ class LinuxLoader(Emulator):
         evdev = conf["EVDEV"]
         if kind == "bowl":
             conf["Display"].update({"WIDTH": "640", "HEIGHT": "480", "FULLSCREEN": "1"})
+        # Go Go Strike: Allegro's 640x480 window, gamescope scales it.
+        if kind == "gogostrike":
+            conf["Display"].update({"WIDTH": "640", "HEIGHT": "480"})
+        # Orange County Choppers Pinball: its portrait picture turned upright
+        # into the full screen.
+        if kind == "occpinball":
+            conf["Display"]["FULLSCREEN"] = "1"
         guns_enabled = self.config.get_bool("use_guns")
         guns = list(self.guns)
         controllers = list(self.controllers)
@@ -492,8 +523,11 @@ class LinuxLoader(Emulator):
                         if code in keys:
                             evdev.setdefault(f"PLAYER_{nplayer}_{action}", f"{node}:KEY:{code}")
 
-        pads = [] if kind == "bowl" else controllers[:max_players]
-        for nplayer, pad in enumerate(pads, start=1):
+        # Rockin' Bowl-O-Rama and Go Go Strike read them themselves (their
+        # trackball is the left stick, which evdev mode does not turn into a
+        # trackball), Orange County Choppers Pinball too (shoulders, triggers
+        # and face buttons of its own).
+        for nplayer, pad in enumerate(controllers[:max_players] if kind not in ('bowl', 'gogostrike', 'occpinball') else [], start=1):
             if nplayer > gun_players:
                 _setup_pad(
                     evdev,
@@ -529,6 +563,11 @@ class LinuxLoader(Emulator):
         # Speed Rider 2: game/bin_linux beside ../data.
         elif (game_dir / "game" / "bin_linux" / "speedrider2").is_file():
             game_dir = game_dir / "game" / "bin_linux"
+        # Gaelco: Ring Riders' and Tuning Race's salidas on the cabinet's disk.
+        for salidas in ('home/joc2001/joc2003/salidas', 'home/joc2001/joc2004/salidas'):
+            if any((game_dir / salidas / exe).is_file() for exe in ('gameport', 'car')):
+                game_dir = game_dir / salidas
+                break
         _fix_pt2_sound_daemon(game_dir)
 
         if kind == "templerun" and (game_dir / "tr").is_file():
@@ -569,6 +608,9 @@ class LinuxLoader(Emulator):
             if links:
                 library_dirs.insert(0, str(links))
             library_dirs.extend(str(d) for d in dirs)
+        if kind == "occpinball":
+            # Its lib/ is the cabinet's /game/dynamic/lib, with its glibc.
+            library_dirs.remove(str(game_dir / 'lib'))
         if kind == "ghostbusters":
             library_dirs.append(str(LINUXLOADER_DIR / "ghostbusters"))
         if kind == "wmmt4":
@@ -576,6 +618,14 @@ class LinuxLoader(Emulator):
         if version == 42:
             library_dirs.append(str(LINUXLOADER_DIR / "lib"))
         library_dirs.extend(["/lib", "/usr/lib", str(LINUXLOADER_DIR)])
+        
+        # Go Go Strike's 640x480 window scaled to the screen by gamescope
+        # (unless the gamescope option already wraps the command).
+        if kind == 'gogostrike' and not self.config.get_bool('gamescope'):
+            command = [
+                'gamescope', '-W', str(self.resolution.width), '-H', str(self.resolution.height),
+                '-w', '640', '-h', '480', '-f', '-S', 'fit', '-F', 'linear', '--', *command,
+            ]
 
         return Command(
             args=command,
@@ -588,3 +638,11 @@ class LinuxLoader(Emulator):
                 "SDL_JOYSTICK_HIDAPI": "0",
             },
         )
+
+
+
+
+
+
+
+

@@ -141,6 +141,22 @@ _logger = logging.getLogger(__name__)
 # the trackball, Start, Back coin, A replay, X scoresheet, Y jukebox, R3 the
 # operator menu, L3 a service credit. It draws at 640x480, scaled full
 # screen (a larger frame leaves old frames on the screen).
+# Go Go Strike (Paokai) is a trackball bowling game: the rom is its
+# directory (bowling_usa, img/, lib/ with the Allegro 4.0, HawkNL and
+# libstdc++.so.5 it links). It runs on linuxloader's own input: the mouse or
+# a trackball rolls the ball (push it up to throw), and the first pad (SDL)
+# too, its left stick the trackball, Start or A start, Back coin, R3 the
+# setup menu, L3 the bookkeeping; the keyboard's 1 start, 5 coin, z clears
+# errors. Its window is Allegro's 640x480, which gamescope scales to the
+# screen (4:3).
+# Orange County Choppers Pinball (Incredible Technologies) is a pinball for
+# a monitor on its side: the rom is its directory (game.bin, pinball/, lib/
+# the cabinet's drivers and glibc, kept off the library path; libpq.so.3 and
+# libstdc++.so.5 beside game.bin). It runs on linuxloader's own input: the
+# first pad's d-pad left/right, shoulders and triggers the flippers, X/B
+# nudge the cabinet left/right, Y both, Start start, Back coin, A select, R3
+# the operator menu; the keyboard's arrows, z/x, Up, 1, 5, F2. linuxloader
+# turns its picture upright into the screen (rotate option: as drawn).
 # Temple Run (Coastal Amusements) is a FreeBSD game: the rom is its
 # directory (tr, its data, lib/ with a 32-bit OpenAL), run by
 # linuxloader_freebsd from there, not by linuxloader. Its I/O board reads
@@ -149,6 +165,15 @@ _logger = logging.getLogger(__name__)
 # drawn for a portrait monitor, is turned upright unless the rotate option
 # is on (a monitor on its side). Both need SDL 1.2, which Batocera does not
 # carry: sdl12-compat's libSDL-1.2.so.0 beside linuxloader.
+# The Gaelco games (Tokyo Cop, Ring Riders, Gaelco Championship Tuning
+# Race) are driving games (left stick or wheel, R2 gas or throttle, L2
+# brake), b the view, y Tokyo Cop's siren, R1/L1 Tuning Race's gear up/down
+# (_PAD_GAELCO). Tokyo Cop's rom is its salidas directory (gameport at its
+# top, save0/ and save1/), Ring Riders' and Tuning Race's the cabinet's disk
+# (home/joc2001/joc2003/salidas/gameport, home/joc2001/joc2004/salidas/car,
+# Tuning Race's aux partition at the root), run from that salidas; their
+# salidas/lib/ holds a libXmu.so.6 stand-in. They live in the gaelco system
+# as "<name> (linuxloader).squashfs", emulator linuxloader per game.
 #
 # World's Largest Pac-Man is a joystick title: no gun inputs are mapped, and
 # the d-pad or left stick controls its four directions.
@@ -366,6 +391,15 @@ _PAD_SPEEDRIDER: Final = {
     'b': 'BUTTON_1',
 }
 
+# Gaelco: b the view, y the siren (Tokyo Cop), R1/L1 the gear up/down
+# (Tuning Race: player 2's up and down, the driving games' gears).
+_PAD_GAELCO: Final = {
+    'b': 'BUTTON_2',
+    'y': 'BUTTON_1',
+    'pagedown': 'PLAYER_2_BUTTON_UP',
+    'pageup': 'PLAYER_2_BUTTON_DOWN',
+}
+
 _DIRECTIONS: Final = ('up', 'down', 'left', 'right')
 
 # Mice and touchpads (a gamepad's too) aim like guns for the players left
@@ -514,8 +548,14 @@ def _game_kind(rom: Path, /) -> str:
         return 'speeddriver'
     if 'bowlorama' in flat:
         return 'bowl'
+    if 'gogostrike' in flat:
+        return 'gogostrike'
+    if 'orangecountychoppers' in flat or 'occpinball' in flat:
+        return 'occpinball'
     if 'templerun' in flat:
         return 'templerun'
+    if 'tokyocop' in flat or 'ringriders' in flat or 'ringraiders' in flat or 'tuningrace' in flat:
+        return 'gaelco'
     if 'teenage mutant ninja turtles' in name or 'tmnt' in name:
         return 'tmnt'
     if 'ghostbusters' in re.sub(r'[^a-z]', '', name):
@@ -676,6 +716,15 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
         for direction in _DIRECTIONS:
             _set(evdev, player + 'BUTTON_' + direction.upper(), _pad_input(pad, direction, digital=True))
+    elif kind == 'gaelco':
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
+        _set(evdev, 'ANALOGUE_2', _pad_input(pad, 'r2', digital=False))
+        _set(evdev, 'ANALOGUE_3', _pad_input(pad, 'l2', digital=False))
+        for name, action in _PAD_GAELCO.items():
+            key = action if action.startswith('PLAYER_') else player + action
+            _set(evdev, key, _pad_input(pad, name, digital=True))
     elif kind == 'piraterevenge':
         if nplayer != 1:
             return
@@ -775,6 +824,13 @@ class LinuxloaderGenerator(Generator):
         # Rockin' Bowl-O-Rama: its own 640x480, scaled to the screen.
         if kind == 'bowl':
             conf['Display'].update({'WIDTH': '640', 'HEIGHT': '480', 'FULLSCREEN': '1'})
+        # Go Go Strike: Allegro's 640x480 window, gamescope scales it.
+        if kind == 'gogostrike':
+            conf['Display'].update({'WIDTH': '640', 'HEIGHT': '480'})
+        # Orange County Choppers Pinball: its portrait picture turned upright
+        # into the full screen.
+        if kind == 'occpinball':
+            conf['Display']['FULLSCREEN'] = '1'
         # Big Buck Pro uses a GLUT window in place of its cabinet game mode.
         if _is_nerf(rom) or 'bigbuckhunterpro' in re.sub(r'[^a-z]', '', rom.name.lower()):
             conf['Display']['FULLSCREEN'] = '1'
@@ -834,9 +890,11 @@ class LinuxloaderGenerator(Generator):
                 _logger.debug('linuxloader: player %s aims with %s (%s)', nplayer, node, axis)
 
         # Pads (and wheels, driving the same way): the players without a gun.
-        # Rockin' Bowl-O-Rama reads them itself (its trackball is the left
-        # stick, which evdev mode does not turn into a trackball).
-        for nplayer, pad in enumerate(playersControllers[:max_players] if kind != 'bowl' else [], start=1):
+        # Rockin' Bowl-O-Rama and Go Go Strike read them themselves (their
+        # trackball is the left stick, which evdev mode does not turn into a
+        # trackball), Orange County Choppers Pinball too (shoulders, triggers
+        # and face buttons of its own).
+        for nplayer, pad in enumerate(playersControllers[:max_players] if kind not in ('bowl', 'gogostrike', 'occpinball') else [], start=1):
             if nplayer > gun_players:
                 wheel = system.config.use_wheels and pad.device_path in wheels
                 _setup_pad(evdev, kind, nplayer, pad, wheel=wheel)
@@ -878,6 +936,11 @@ class LinuxloaderGenerator(Generator):
         # Speed Rider 2: game/bin_linux beside ../data.
         elif (game_dir / 'game' / 'bin_linux' / 'speedrider2').is_file():
             game_dir = game_dir / 'game' / 'bin_linux'
+        # Gaelco: Ring Riders' and Tuning Race's salidas on the cabinet's disk.
+        for salidas in ('home/joc2001/joc2003/salidas', 'home/joc2001/joc2004/salidas'):
+            if any((game_dir / salidas / exe).is_file() for exe in ('gameport', 'car')):
+                game_dir = game_dir / salidas
+                break
         _fix_pt2_sound_daemon(game_dir)
         if kind == 'templerun' and (game_dir / 'tr').is_file():
             return self._temple_run(system, game_dir, playersControllers)
@@ -905,6 +968,9 @@ class LinuxloaderGenerator(Generator):
             if links:
                 library_dirs.insert(0, str(links))
             library_dirs.extend(str(d) for d in dirs)
+        if kind == 'occpinball':
+            # Its lib/ is the cabinet's /game/dynamic/lib, with its glibc.
+            library_dirs.remove(str(game_dir / 'lib'))
         if kind == 'ghostbusters':
             # The ELF links ESD but imports none of its symbols. Its empty
             # compatibility library must only be offered to this game.
@@ -920,6 +986,13 @@ class LinuxloaderGenerator(Generator):
         library_dirs.extend(['/lib', '/usr/lib', str(LINUXLOADER_DIR)])
         
         print("Chargement des libs : ", library_dirs, file=sys.stderr)
+        # Go Go Strike's 640x480 window scaled to the screen by gamescope
+        # (unless the gamescope option already wraps the command).
+        if kind == 'gogostrike' and not system.config.get_bool('gamescope'):
+            command = [
+                'gamescope', '-W', str(gameResolution['width']), '-H', str(gameResolution['height']),
+                '-w', '640', '-h', '480', '-f', '-S', 'fit', '-F', 'linear', '--', *command,
+            ]
 
         os.chdir(LINUXLOADER_DIR)
         return Command.Command(

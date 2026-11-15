@@ -104,8 +104,9 @@ env:
   # node check FUN_0067afa0, else "Error 6401 JVS I/O board is not connected").
   # Left grip (the JVS board, player 1; the game's INPUT TEST, FUN_008a04b0): button 1 JUMP,
   # button 2 DASH, button 3 ACTION; the move stick on analog channel 1 (X) and 0 (Y): the game
-  # swaps the two channels (FUN_00679de0)
-  WAL_TYPEX_JVS_ANALOG_INPUTS: "ly,lx"
+  # swaps the two channels (FUN_00679de0); its Y up is forward (the stick's up negative: inverted,
+  # else forward and back swapped)
+  WAL_TYPEX_JVS_ANALOG_INPUTS: "-ly,lx"
   WAL_TYPEX_JVS_ROTARY: "2"
   WAL_TYPEX_JVS_OUTPUTS: "20"
   # Right grip: the cabinet's aim control is a USB mouse read with DirectInput (relative motion,
@@ -128,6 +129,16 @@ env:
   # from 332-3641, i.e. X mirrored on the panel, Y from the bottom (the screen points of the
   # panel's report at the screen's top left and bottom right)
   WAL_RINGEDGE_TOUCH_CALIBRATION: "942.25,48.8,73,533.5"
+  # the touch pointer: a small red dot where the left stick points (drawn over the picture by
+  # the OpenGL fix-up), hidden after 5 s without moving (the stick also moves the mech in battle)
+  WAL_CROSSHAIR: "1"
+  WAL_CROSSHAIR_STYLE: disc
+  WAL_CROSSHAIR_SIZE: "2"
+  WAL_CROSSHAIR_COLOR: FF2020
+  WAL_CROSSHAIR_HIDE: "5"
+  # the pointer (touch and dot): the mouse (on the pedals) or the left stick, the last moved
+  WAL_RINGEDGE_TOUCH_POINTER: pedals-stick
+  WAL_CROSSHAIR_AXES: pedals-stick
   # COM2 is the cabinet's IC card reader/writer, checked at boot ("CHECKING IC CARD R/W", error
   # 23 without an answer): emulated without a card
   WAL_RINGEDGE_IC_CARD: COM2
@@ -150,6 +161,29 @@ drives:
 # buttons; the touch panel for the menus (start: touch the screen).
 input:
   stick_as_dpad: false
+  # the mouse (or a gun) is the touch pointer, its left button the touch: its position on the
+  # pedals, which the game does not read (on the left stick it would walk the mech in battle);
+  # the touch's place is the mouse or the left stick, whichever moved last
+  guns_enabled: true
+  gun:
+    x: accel
+    y: brake
+    BTN_LEFT: b8
+    BTN_RIGHT: none
+    BTN_MIDDLE: none
+    BTN_2: none
+  # the keyboard: WASD the move stick, the arrows the aim (the defaults: left Ctrl jump, left
+  # Alt dash, Space action, left Shift fire, V the touch)
+  keyboard:
+    p1:
+      KEY_W: -ly
+      KEY_S: ly
+      KEY_A: -lx
+      KEY_D: lx
+      KEY_UP: -ry
+      KEY_DOWN: ry
+      KEY_LEFT: -rx
+      KEY_RIGHT: rx
 
 # Control names for the GUI mapping rows.
 controls:
@@ -173,3 +207,15 @@ options:
         kind: bool
         description: >-
           Games start without coins. Off: the coins and credits of the system test menu.
+      - key: WAL_CROSSHAIR
+        label: Touch pointer
+        kind: bool
+        description: >-
+          A small red dot where the left stick points (the touch position).
+      - key: WAL_CROSSHAIR_SIZE
+        label: Touch pointer size
+        kind: number
+        min: 1
+        max: 6
+        description: >-
+          The dot's size, in percent of the screen height.
