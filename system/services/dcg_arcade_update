@@ -1,10 +1,10 @@
 #!/bin/bash
-# dcg_update : au démarrage, compare la version locale à celle du dépôt
+# dcg_arcade_update : au démarrage, compare la version locale à celle du dépôt
 # et relance install.sh si une version plus récente existe.
 
 REPO_RAW="https://raw.githubusercontent.com/DreamerCG/linuxloader/main"
 VERSION_FILE="/userdata/system/dcg/VERSION"
-LOG="/userdata/system/logs/dcg_update.log"
+LOG="/userdata/system/logs/dcg_arcade_update.log"
 LINUXLOADER_DIR="/userdata/system/dcg/emulators/linuxloader"
 WAL_DESKTOP_SOURCE="/userdata/system/tools/windows-arcade-loader.desktop"
 WAL_DESKTOP_DEST="/usr/share/applications/windows-arcade-loader.desktop"

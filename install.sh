@@ -360,14 +360,25 @@ if [ -d "$WAL" ]; then
 fi
 ok "Droits d'exécution appliqués"
 
-SVC="$DEST/system/services/dcg_update"
+SVC="$DEST/system/services/dcg_arcade_update"
 if [ -f "$SVC" ]; then
+    # Retire l'ancien service dcg_update remplacé par dcg_arcade_update
+    OLD_SVC="$DEST/system/services/dcg_update"
+    if [ -e "$OLD_SVC" ]; then
+        if command -v batocera-services >/dev/null 2>&1; then
+            batocera-services disable dcg_update >/dev/null 2>&1 || true
+        fi
+        rm -f "$OLD_SVC"
+        ok "Ancien service dcg_update retiré"
+    fi
+    rm -f /userdata/system/logs/dcg_update.log
+
     sed -i 's/\r$//' "$SVC"
     chmod +x "$SVC"
     if command -v batocera-services >/dev/null 2>&1; then
-        batocera-services enable dcg_update >/dev/null 2>&1 || warn "activation du service impossible"
+        batocera-services enable dcg_arcade_update >/dev/null 2>&1 || warn "activation du service impossible"
     fi
-    ok "Service dcg_update installé"
+    ok "Service dcg_arcade_update installé"
 fi
 
 # Crée les dossiers ROM uniquement s'ils ne sont pas des liens symboliques existants.
