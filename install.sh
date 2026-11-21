@@ -171,7 +171,7 @@ fi
 
 # Les autres préfixes sont versionnés comme full et dotnet11, et peuvent ainsi
 # réutiliser une archive déjà installée quand son contenu n'a pas changé.
-for prefix in apm3-test hog-wild wasteland; do
+for prefix in apm3-test dotnet48 hog-wild wasteland; do
     WAL_PREFIX_ARCHIVE="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.tar.gz"
     INSTALLED_WAL_PREFIX_ARCHIVE="$DEST/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.tar.gz"
     WAL_PREFIX_ARCHIVE_VERSION="$SRC/system/dcg/emulators/windows-arcade-loader/wine-prefix/$prefix.version"
@@ -503,6 +503,8 @@ for f in \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/apm3-test.version \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.version \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet48.tar.gz \
+    system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet48.version \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/hog-wild.tar.gz \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/hog-wild.version \
     system/dcg/emulators/windows-arcade-loader/wine-prefix/wasteland.tar.gz \
