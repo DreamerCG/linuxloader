@@ -32,31 +32,31 @@ fail() { printf "\n${R}✘ ERREUR : %s${N}\n" "$1"; exit 1; }
 
 DOWNLOAD_ATTEMPTS=10
 
-# Télécharge une archive .tar.gz avec 3 tentatives (connexions instables).
-# Une tentative échoue aussi si le fichier reçu est un pointeur LFS ou un gzip tronqué.
+# Télécharge et valide une archive .tar.gz. Conserve les téléchargements
+# incomplets pour permettre à curl/wget de reprendre au prochain essai.
 download_file() {
     local url="$1" dest="$2" label="$3" attempt=1
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
         || fail "ni curl ni wget n'est disponible pour télécharger $label"
     while [ "$attempt" -le "$DOWNLOAD_ATTEMPTS" ]; do
-        rm -f "$dest"
         if command -v curl >/dev/null 2>&1; then
-            curl -fsL --retry 2 --retry-delay 2 --connect-timeout 20 -o "$dest" "$url" || rm -f "$dest"
+            curl -fL --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 20 \
+                --continue-at - -o "$dest" "$url" || true
         else
-            wget -q -T 30 -O "$dest" "$url" || rm -f "$dest"
+            wget -c -T 30 -O "$dest" "$url" || true
         fi
         if [ -f "$dest" ] \
             && ! head -n 1 "$dest" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
             && gzip -t "$dest" >/dev/null 2>&1; then
             return 0
         fi
-        rm -f "$dest"
         if [ "$attempt" -lt "$DOWNLOAD_ATTEMPTS" ]; then
             warn "Échec du téléchargement de $label (tentative $attempt/$DOWNLOAD_ATTEMPTS), nouvel essai dans $((attempt * 3))s..."
             sleep $((attempt * 3))
         fi
         attempt=$((attempt + 1))
     done
+    [ ! -f "$dest" ] || rm -f "$dest"
     return 1
 }
 
