@@ -292,8 +292,10 @@ else
     WAL_RUNNER_ACTUAL_VERSION="$(sha256sum "$WAL_RUNNER_ARCHIVE" | awk '{ print $1 }')"
     [ "$WAL_RUNNER_ACTUAL_VERSION" = "$WAL_RUNNER_EXPECTED_VERSION" ] \
         || fail "l'archive GE-Proton téléchargée ne correspond pas à la version attendue"
-    gzip -t "$WAL_RUNNER_ARCHIVE" \
-        || fail "l'archive GE-Proton a une empreinte correcte mais n'est pas gzip; aucun fichier n'a été installé"
+    if ! gzip -t "$WAL_RUNNER_ARCHIVE" >/dev/null 2>&1 \
+        && ! tar -tf "$WAL_RUNNER_ARCHIVE" >/dev/null 2>&1; then
+        fail "l'archive GE-Proton a une empreinte correcte mais n'est ni gzip ni tar valide; aucun fichier n'a été installé"
+    fi
     mkdir -p "$WAL_RUNNER_CUSTOM"
     # L'archive du dépôt contient déjà le dossier GE-Proton complet à sa racine.
     # On l'extrait donc directement dans wine/custom pour garder son arborescence.
