@@ -157,6 +157,13 @@ _logger = logging.getLogger(__name__)
 # nudge the cabinet left/right, Y both, Start start, Back coin, A select, R3
 # the operator menu; the keyboard's arrows, z/x, Up, 1, 5, F2. linuxloader
 # turns its picture upright into the screen (rotate option: as drawn).
+# Skycurser (Byoyoyo) is a GameMaker: Studio shoot'em up: the rom is its
+# directory (runner, assets/, lib/ with the OpenAL Soft and OpenSSL 1.0.0
+# it links, bezel.png). The game reads the keyboard only; linuxloader turns
+# each player's pad into its keys: d-pad or left stick move, b (bottom)
+# the shotgun, a (right) the katana, y (left) the weapon switch, Start,
+# Select coin, R3 the operator menu. The runner takes the whole screen,
+# its 4:3 picture in the bezel's hole.
 # Temple Run (Coastal Amusements) is a FreeBSD game: the rom is its
 # directory (tr, its data, lib/ with a 32-bit OpenAL), run by
 # linuxloader_freebsd from there, not by linuxloader. Its I/O board reads
@@ -306,6 +313,14 @@ _PAD_DHRIDERS: Final = {
 
 # Joystick: b (bottom face button) starts and fires.
 _PAD_JOYSTICK: Final = {'b': 'BUTTON_1'}
+
+# Skycurser: b (bottom) the shotgun, a (right) the katana, y (left) the
+# weapon switch.
+_PAD_SKYCURSER: Final = {
+    'b': 'BUTTON_1',
+    'a': 'BUTTON_2',
+    'y': 'BUTTON_3',
+}
 
 _PAD_TMNT: Final = {
     'a': 'BUTTON_1',
@@ -552,6 +567,8 @@ def _game_kind(rom: Path, /) -> str:
         return 'gogostrike'
     if 'orangecountychoppers' in flat or 'occpinball' in flat:
         return 'occpinball'
+    if 'skycurser' in flat:
+        return 'skycurser'
     if 'templerun' in flat:
         return 'templerun'
     if 'tokyocop' in flat or 'ringriders' in flat or 'ringraiders' in flat or 'tuningrace' in flat:
@@ -744,6 +761,12 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         for direction in _DIRECTIONS:
             sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
             _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
+    elif kind == 'skycurser':
+        for name, action in _PAD_SKYCURSER.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+        for direction in _DIRECTIONS:
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
     elif kind == 'tmnt':
         for name, action in _PAD_TMNT.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
@@ -791,6 +814,8 @@ class LinuxloaderGenerator(Generator):
                 'PIPEWIRE_MODULE_DIR': '/lib32/pipewire-0.3:/usr/lib/pipewire-0.3',
                 # Upright on a landscape screen; as drawn on a monitor on its side.
                 'FBSD_ROTATE': '' if system.config.get_bool('linuxloader_rotate') else 'ccw',
+                # Its bezel.png around the turned picture, unless turned off.
+                'FBSD_BEZEL': '0' if system.config.get('linuxloader_bezel') == '0' else 'bezel.png',
                 'SDL_GAMECONTROLLERCONFIG': generate_sdl_game_controller_config(playersControllers),
                 'SDL_JOYSTICK_HIDAPI': '0',
             },

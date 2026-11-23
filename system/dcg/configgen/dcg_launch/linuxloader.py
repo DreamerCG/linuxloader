@@ -62,6 +62,7 @@ _PAD_DHRIDERS: Final = {
     "up": "BUTTON_UP", "down": "BUTTON_DOWN",
 }
 _PAD_JOYSTICK: Final = {"b": "BUTTON_1"}
+_PAD_SKYCURSER: Final = {"b": "BUTTON_1", "a": "BUTTON_2", "y": "BUTTON_3"}
 _PAD_TMNT: Final = {"a": "BUTTON_1", "b": "BUTTON_2", "x": "BUTTON_3"}
 _PAD_GHOSTBUSTERS: Final = {
     "b": "BUTTON_1", "a": "BUTTON_2", "y": "BUTTON_3", "up": "BUTTON_UP", "down": "BUTTON_DOWN",
@@ -240,6 +241,8 @@ def _game_kind(rom: Path, /) -> str:
         return "gogostrike"
     if "orangecountychoppers" in flat or "occpinball" in flat:
         return "occpinball"
+    if "skycurser" in flat:
+        return "skycurser"
     if "templerun" in flat:
         return "templerun"
     if "tokyocop" in flat or "ringriders" in flat or "ringraiders" in flat or "tuningrace" in flat:
@@ -415,6 +418,15 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
         _set(evdev, "ANALOGUE_3", _pad_input(pad, "joystick1left", digital=False))
         for name, action in _PAD_WOF.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == "skycurser":
+        for name, action in _PAD_SKYCURSER.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+        for direction in _DIRECTIONS:
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(
+                evdev, player + "BUTTON_" + direction.upper(),
+                ",".join(dict.fromkeys(source for source in sources if source)) or None,
+            )
     elif kind in ("joystick", "tmnt"):
         mapping = _PAD_TMNT if kind == "tmnt" else _PAD_JOYSTICK
         for name, action in mapping.items():
@@ -496,9 +508,12 @@ class LinuxLoader(Emulator):
             for nplayer, gun in enumerate(guns[:max_players], start=1):
                 evdev[f"ANALOGUE_{nplayer * 2 - 1}"] = f"{gun.node}:ABS:0"
                 evdev[f"ANALOGUE_{nplayer * 2}"] = f"{gun.node}:ABS:1"
-                buttons = _HALO_GUN_BUTTONS if kind == "halo" else (
-                    _GUN_BUTTONS_WITH_START if "1" in gun.buttons else _GUN_BUTTONS
-                )
+                if kind == "halo":
+                    buttons = _HALO_GUN_BUTTONS
+                elif "1" in gun.buttons:
+                    buttons = _GUN_BUTTONS_WITH_START
+                else:
+                    buttons = _GUN_BUTTONS
                 for button, (action, code) in buttons.items():
                     key = f"PLAYER_{nplayer}_{action}"
                     if button in gun.buttons and key not in evdev:
@@ -518,10 +533,11 @@ class LinuxLoader(Emulator):
                 evdev[f"ANALOGUE_{nplayer * 2}"] = (
                     f"{node}:{axis}:{ecodes.ABS_Y if axis == 'ABS' else ecodes.REL_Y}"
                 )
-                if kind != "wof":
-                    for action, code in _POINTER_BUTTONS.items():
-                        if code in keys:
-                            evdev.setdefault(f"PLAYER_{nplayer}_{action}", f"{node}:KEY:{code}")
+                if kind == "wof":
+                    continue
+                for action, code in _POINTER_BUTTONS.items():
+                    if code in keys:
+                        evdev.setdefault(f"PLAYER_{nplayer}_{action}", f"{node}:KEY:{code}")
 
         # Rockin' Bowl-O-Rama and Go Go Strike read them themselves (their
         # trackball is the left stick, which evdev mode does not turn into a
@@ -583,6 +599,7 @@ class LinuxLoader(Emulator):
                     "SPA_PLUGIN_DIR": "/lib32/spa-0.2:/usr/lib/spa-0.2",
                     "PIPEWIRE_MODULE_DIR": "/lib32/pipewire-0.3:/usr/lib/pipewire-0.3",
                     "FBSD_ROTATE": "" if self.config.get_bool("linuxloader_rotate") else "ccw",
+                    "FBSD_BEZEL": "0" if self.config.get("linuxloader_bezel") == "0" else "bezel.png",
                     "SDL_GAMECONTROLLERCONFIG": generate_sdl_game_controller_config(controllers),
                     "SDL_JOYSTICK_HIDAPI": "0",
                 },
@@ -615,6 +632,7 @@ class LinuxLoader(Emulator):
             library_dirs.append(str(LINUXLOADER_DIR / "ghostbusters"))
         if kind == "wmmt4":
             library_dirs.append(str(LINUXLOADER_DIR / "wmmt4"))
+        # Extra libraries used only on Batocera 42.
         if version == 42:
             library_dirs.append(str(LINUXLOADER_DIR / "lib"))
         library_dirs.extend(["/lib", "/usr/lib", str(LINUXLOADER_DIR)])
