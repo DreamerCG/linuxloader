@@ -12,6 +12,7 @@ WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/Drea
 WAL_DOTNET11_URL="${WAL_DOTNET11_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz}"
 WAL_PREFIX_ARCHIVE_URL_BASE="${WAL_PREFIX_ARCHIVE_URL_BASE:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix}"
 WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/GE-Proton11-12-x86_64.tar.gz}"
+INSTALLER_REVISION="2026-11-23-range-validation-2"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
 WORK="$DEST/system/.dcg_install_tmp"
