@@ -62,7 +62,7 @@ download_file() {
 # so a dropped connection does not restart the entire object.
 download_lfs_object() {
     local url="$1" dest="$2" label="$3" expected_size="$4" expected_sha="$5"
-    local chunk_size=16777216 start end range_file range_headers http_code received
+    local chunk_size=16777216 start end range_file range_headers http_code received attempt
     command -v curl >/dev/null 2>&1 || fail "curl est nécessaire pour télécharger $label par plages"
     range_file="$dest.part"
     range_headers="$dest.headers"
@@ -71,18 +71,27 @@ download_lfs_object() {
     while [ "$start" -lt "$expected_size" ]; do
         end=$((start + chunk_size - 1))
         [ "$end" -lt "$expected_size" ] || end=$((expected_size - 1))
-        if ! curl -fsSL --connect-timeout 20 --max-time 300 \
-            -H "Range: bytes=$start-$end" -D "$range_headers" -o "$range_file" "$url"; then
-            warn "Connexion interrompue pour $label à l’octet $start/$expected_size; nouvelle tentative..."
+        attempt=1
+        while [ "$attempt" -le "$DOWNLOAD_ATTEMPTS" ]; do
             rm -f "$range_file" "$range_headers"
-            sleep 3
-            continue
-        fi
-        http_code="$(awk '/^HTTP\// { code=$2 } END { print code }' "$range_headers")"
-        received="$(wc -c < "$range_file" | tr -d ' ')"
-        if [ "$http_code" != "206" ] || [ "$received" -ne "$((end - start + 1))" ]; then
-            warn "Réponse de plage invalide pour $label (HTTP $http_code, $received octets reçus, $((end - start + 1)) attendus)"
-            rm -f "$range_file" "$range_headers" "$dest"
+            if curl -fsSL --connect-timeout 20 --max-time 300 \
+                -H "Range: bytes=$start-$end" -D "$range_headers" -o "$range_file" "$url"; then
+                http_code="$(awk '/^HTTP\// { code=$2 } END { print code }' "$range_headers")"
+                received="$(wc -c < "$range_file" | tr -d ' ')"
+                if [ "$http_code" = "206" ] && [ "$received" -eq "$((end - start + 1))" ]; then
+                    break
+                fi
+                warn "Réponse de plage invalide pour $label (HTTP $http_code, $received octets reçus, $((end - start + 1)) attendus)"
+                rm -f "$range_file" "$range_headers" "$dest"
+                return 1
+            fi
+            warn "Erreur réseau pour $label, plage $start-$end (tentative $attempt/$DOWNLOAD_ATTEMPTS)"
+            rm -f "$range_file" "$range_headers"
+            attempt=$((attempt + 1))
+            [ "$attempt" -le "$DOWNLOAD_ATTEMPTS" ] && sleep 3
+        done
+        if [ "$attempt" -gt "$DOWNLOAD_ATTEMPTS" ]; then
+            rm -f "$dest" "$range_file" "$range_headers"
             return 1
         fi
         cat "$range_file" >> "$dest" || return 1
