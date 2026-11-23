@@ -101,10 +101,16 @@ download_lfs_object() {
     printf '\n'
     rm -f "$range_file" "$range_headers"
     if [ "$(sha256sum "$dest" | awk '{ print $1 }')" != "$expected_sha" ]; then
-        warn "SHA-256 incorrect pour $label; archive supprimée"
+        warn "SHA-256 incorrect pour $label; archive supprimée (octets reçus : $(wc -c < "$dest" | tr -d ' '))"
         rm -f "$dest"
         return 1
     fi
+    if ! gzip -t "$dest" >/dev/null 2>&1; then
+        warn "L’empreinte est correcte, mais $label n’est pas une archive gzip valide"
+        rm -f "$dest"
+        return 1
+    fi
+    return 0
 }
 
 resolve_lfs_archive() {
@@ -277,11 +283,13 @@ else
     [ -n "$WAL_RUNNER_EXPECTED_SIZE" ] || fail "taille LFS introuvable pour l’archive GE-Proton"
     download_lfs_object "$WAL_RUNNER_URL" "$WAL_RUNNER_ARCHIVE" "le runner GE-Proton" \
         "$WAL_RUNNER_EXPECTED_SIZE" "$WAL_RUNNER_EXPECTED_VERSION" \
-        || fail "téléchargement du runner GE-Proton impossible après $DOWNLOAD_ATTEMPTS tentatives"
+        || fail "téléchargement ou validation du runner GE-Proton impossible; aucun fichier n'a été installé"
     command -v sha256sum >/dev/null 2>&1 || fail "sha256sum est nécessaire pour vérifier l'archive GE-Proton"
     WAL_RUNNER_ACTUAL_VERSION="$(sha256sum "$WAL_RUNNER_ARCHIVE" | awk '{ print $1 }')"
     [ "$WAL_RUNNER_ACTUAL_VERSION" = "$WAL_RUNNER_EXPECTED_VERSION" ] \
         || fail "l'archive GE-Proton téléchargée ne correspond pas à la version attendue"
+    gzip -t "$WAL_RUNNER_ARCHIVE" \
+        || fail "l'archive GE-Proton a une empreinte correcte mais n'est pas gzip; aucun fichier n'a été installé"
     mkdir -p "$WAL_RUNNER_CUSTOM"
     # L'archive du dépôt contient déjà le dossier GE-Proton complet à sa racine.
     # On l'extrait donc directement dans wine/custom pour garder son arborescence.
