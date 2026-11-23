@@ -32,18 +32,17 @@ fail() { printf "\n${R}✘ ERREUR : %s${N}\n" "$1"; exit 1; }
 
 DOWNLOAD_ATTEMPTS=10
 
-# Télécharge et valide une archive .tar.gz. Conserve les téléchargements
-# incomplets pour permettre à curl/wget de reprendre au prochain essai.
+# Télécharge une archive .tar.gz avec plusieurs tentatives.
 download_file() {
     local url="$1" dest="$2" label="$3" attempt=1
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
         || fail "ni curl ni wget n'est disponible pour télécharger $label"
     while [ "$attempt" -le "$DOWNLOAD_ATTEMPTS" ]; do
+        rm -f "$dest"
         if command -v curl >/dev/null 2>&1; then
-            curl -fL --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 20 \
-                --continue-at - -o "$dest" "$url" || true
+            curl -fsSL --retry 2 --retry-delay 2 --connect-timeout 20 -o "$dest" "$url" || rm -f "$dest"
         else
-            wget -c -T 30 -O "$dest" "$url" || true
+            wget -q -T 30 -O "$dest" "$url" || rm -f "$dest"
         fi
         if [ -f "$dest" ] \
             && ! head -n 1 "$dest" | grep -qF 'version https://git-lfs.github.com/spec/v1' \
@@ -56,8 +55,47 @@ download_file() {
         fi
         attempt=$((attempt + 1))
     done
-    [ ! -f "$dest" ] || rm -f "$dest"
     return 1
+}
+
+# GE-Proton is a 1.6 GB Git LFS object. Download it in verified byte ranges
+# so a dropped connection does not restart the entire object.
+download_lfs_object() {
+    local url="$1" dest="$2" label="$3" expected_size="$4" expected_sha="$5"
+    local chunk_size=16777216 start end range_file range_headers http_code received
+    command -v curl >/dev/null 2>&1 || fail "curl est nécessaire pour télécharger $label par plages"
+    range_file="$dest.part"
+    range_headers="$dest.headers"
+    rm -f "$dest" "$range_file" "$range_headers"
+    start=0
+    while [ "$start" -lt "$expected_size" ]; do
+        end=$((start + chunk_size - 1))
+        [ "$end" -lt "$expected_size" ] || end=$((expected_size - 1))
+        if ! curl -fsSL --connect-timeout 20 --max-time 300 \
+            -H "Range: bytes=$start-$end" -D "$range_headers" -o "$range_file" "$url"; then
+            warn "Connexion interrompue pour $label à l’octet $start/$expected_size; nouvelle tentative..."
+            rm -f "$range_file" "$range_headers"
+            sleep 3
+            continue
+        fi
+        http_code="$(awk '/^HTTP\// { code=$2 } END { print code }' "$range_headers")"
+        received="$(wc -c < "$range_file" | tr -d ' ')"
+        if [ "$http_code" != "206" ] || [ "$received" -ne "$((end - start + 1))" ]; then
+            warn "Réponse de plage invalide pour $label (HTTP $http_code, $received octets reçus, $((end - start + 1)) attendus)"
+            rm -f "$range_file" "$range_headers" "$dest"
+            return 1
+        fi
+        cat "$range_file" >> "$dest" || return 1
+        start=$((end + 1))
+        printf '\r  Téléchargement %s : %s/%s Mio' "$label" "$((start / 1048576))" "$(((expected_size + 1048575) / 1048576))"
+    done
+    printf '\n'
+    rm -f "$range_file" "$range_headers"
+    if [ "$(sha256sum "$dest" | awk '{ print $1 }')" != "$expected_sha" ]; then
+        warn "SHA-256 incorrect pour $label; archive supprimée"
+        rm -f "$dest"
+        return 1
+    fi
 }
 
 resolve_lfs_archive() {
@@ -226,7 +264,10 @@ else
         ok "Version GE-Proton différente ou inconnue, réinstallation requise"
     fi
     WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-12-x86_64.tar.gz"
-    download_file "$WAL_RUNNER_URL" "$WAL_RUNNER_ARCHIVE" "le runner GE-Proton" \
+    WAL_RUNNER_EXPECTED_SIZE="$(awk '$1 == "size" { print $2; exit }' "$WAL_RUNNER_SOURCE")"
+    [ -n "$WAL_RUNNER_EXPECTED_SIZE" ] || fail "taille LFS introuvable pour l’archive GE-Proton"
+    download_lfs_object "$WAL_RUNNER_URL" "$WAL_RUNNER_ARCHIVE" "le runner GE-Proton" \
+        "$WAL_RUNNER_EXPECTED_SIZE" "$WAL_RUNNER_EXPECTED_VERSION" \
         || fail "téléchargement du runner GE-Proton impossible après $DOWNLOAD_ATTEMPTS tentatives"
     command -v sha256sum >/dev/null 2>&1 || fail "sha256sum est nécessaire pour vérifier l'archive GE-Proton"
     WAL_RUNNER_ACTUAL_VERSION="$(sha256sum "$WAL_RUNNER_ARCHIVE" | awk '{ print $1 }')"
