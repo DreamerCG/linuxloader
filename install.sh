@@ -106,8 +106,11 @@ download_lfs_object() {
         rm -f "$dest"
         return 1
     fi
-    if ! gzip -t "$dest" >/dev/null 2>&1; then
-        warn "L’empreinte est correcte, mais $label n’est pas une archive gzip valide"
+    # The LFS object can be a gzip-compressed tarball or a plain tar archive
+    # (the latter was published with the .tar.gz name for newer GE-Proton builds).
+    if ! gzip -t "$dest" >/dev/null 2>&1 \
+        && ! tar -tf "$dest" >/dev/null 2>&1; then
+        warn "L’empreinte est correcte, mais $label n’est ni une archive gzip ni une archive tar valide"
         rm -f "$dest"
         return 1
     fi
@@ -295,7 +298,11 @@ else
     # L'archive du dépôt contient déjà le dossier GE-Proton complet à sa racine.
     # On l'extrait donc directement dans wine/custom pour garder son arborescence.
     rm -rf "$WAL_RUNNER"
-    tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_CUSTOM" \
+    if gzip -t "$WAL_RUNNER_ARCHIVE" >/dev/null 2>&1; then
+        tar -xzpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_CUSTOM"
+    else
+        tar -xpf "$WAL_RUNNER_ARCHIVE" -C "$WAL_RUNNER_CUSTOM"
+    fi \
         || fail "extraction du runner GE-Proton dans $WAL_RUNNER_CUSTOM impossible"
     [ -x "$WAL_RUNNER/bin/wine" ] \
         || fail "le runner extrait ne contient pas bin/wine exécutable dans $WAL_RUNNER"
