@@ -36,6 +36,9 @@ _HALO_GUN_BUTTONS: Final = {
     "1": ("BUTTON_START", ecodes.BTN_1),
     "2": ("COIN", ecodes.BTN_2),
 }
+
+# Deal or No Deal: case, DEAL, NO DEAL, and Double Deal.
+_PAD_DOND: Final = {"b": "BUTTON_1", "y": "BUTTON_2", "a": "BUTTON_3", "x": "BUTTON_4"}
 _PAD_COMMON: Final = {"start": "BUTTON_START", "select": "COIN", "r3": "TEST_BUTTON", "l3": "BUTTON_SERVICE"}
 _PAD_DRIVING: Final = {
     "y": "BUTTON_1", "b": "BUTTON_2", "a": "BUTTON_3", "up": "BUTTON_UP", "down": "BUTTON_DOWN",
@@ -64,6 +67,8 @@ _PAD_DHRIDERS: Final = {
 _PAD_JOYSTICK: Final = {"b": "BUTTON_1"}
 _PAD_SKYCURSER: Final = {"b": "BUTTON_1", "a": "BUTTON_2", "y": "BUTTON_3"}
 _PAD_TMNT: Final = {"a": "BUTTON_1", "b": "BUTTON_2", "x": "BUTTON_3"}
+# Marvel Contest of Champions: light, medium, heavy, special.
+_PAD_MCOC: Final = {"y": "BUTTON_1", "x": "BUTTON_2", "a": "BUTTON_3", "b": "BUTTON_4"}
 _PAD_GHOSTBUSTERS: Final = {
     "b": "BUTTON_1", "a": "BUTTON_2", "y": "BUTTON_3", "up": "BUTTON_UP", "down": "BUTTON_DOWN",
 }
@@ -227,6 +232,8 @@ def _game_kind(rom: Path, /) -> str:
         return "goldcaptain"
     if "piraterevenge" in flat:
         return "piraterevenge"
+    if any(k in flat for k in ("percussionmaster", "rockfever", "muzibox", "fishhunter")):
+        return "igsown"
     if re.search(r'speeddriver[234]', re.sub(r'[^a-z0-9]', '', name)):
         return 'speeddriver234'
     if 'powertruck' in flat:
@@ -249,6 +256,8 @@ def _game_kind(rom: Path, /) -> str:
         return "gaelco"
     if "teenage mutant ninja turtles" in name or "tmnt" in name:
         return "tmnt"
+    if "contestofchampions" in flat or "mcoc" in flat:
+        return "mcoc"
     if "ghostbusters" in flat:
         return "ghostbusters"
     if "spaceinvadersfrenzy" in flat:
@@ -257,6 +266,8 @@ def _game_kind(rom: Path, /) -> str:
         return "joystick"
     if "centipede" in name:
         return "centipede"
+    if "minecraft" in name:
+        return "minecraft"
     if "cruis" in name or "superbikes" in flat:
         return "driving"
     if "motogp" in flat:
@@ -273,6 +284,10 @@ def _game_kind(rom: Path, /) -> str:
         return "deadheat"
     if "tanktanktank" in flat:
         return "tank"
+    if "doodlejump" in flat:
+        return "doodlejump"
+    if "dealornodeal" in flat or "dealornotdeal" in flat:
+        return "dond"
     if "galaga" in name or "pac" in name or "panther" in name:
         return "joystick"
     if "fortune" in name:
@@ -418,6 +433,22 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
         _set(evdev, "ANALOGUE_3", _pad_input(pad, "joystick1left", digital=False))
         for name, action in _PAD_WOF.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == "doodlejump":
+        if nplayer != 1:
+            return
+        for direction in ("left", "right"):
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(evdev, player + "BUTTON_" + direction.upper(), ",".join(dict.fromkeys(s for s in sources if s)) or None)
+    elif kind == "dond":
+        if nplayer != 1:
+            return
+        _set(evdev, "ANALOGUE_5", _pad_input(pad, "joystick1left", digital=False))
+        _set(evdev, "ANALOGUE_6", _pad_input(pad, "joystick1up", digital=False))
+        for name, action in _PAD_DOND.items():
+            source = _pad_input(pad, name, digital=True)
+            key = player + action
+            if source is not None:
+                evdev[key] = f"{evdev[key]},{source}" if key in evdev else source
     elif kind == "skycurser":
         for name, action in _PAD_SKYCURSER.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
@@ -438,6 +469,15 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad, /, *, wheel:
                 ",".join(dict.fromkeys(source for source in sources if source)) or None,
             )
         if kind == "tmnt" and nplayer == 1:
+            _set(evdev, "VOLUME_UP", _pad_input(pad, "pageup", digital=True))
+            _set(evdev, "VOLUME_DOWN", _pad_input(pad, "pagedown", digital=True))
+    elif kind == "mcoc":
+        for name, action in _PAD_MCOC.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+        for direction in _DIRECTIONS:
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(evdev, player + "BUTTON_" + direction.upper(), ",".join(dict.fromkeys(s for s in sources if s)) or None)
+        if nplayer == 1:
             _set(evdev, "VOLUME_UP", _pad_input(pad, "pageup", digital=True))
             _set(evdev, "VOLUME_DOWN", _pad_input(pad, "pagedown", digital=True))
 
@@ -495,14 +535,16 @@ class LinuxLoader(Emulator):
         # into the full screen.
         if kind == "occpinball":
             conf["Display"]["FULLSCREEN"] = "1"
+        if kind == "mcoc":
+            conf["Display"]["FULLSCREEN"] = "1"
         guns_enabled = self.config.get_bool("use_guns")
         guns = list(self.guns)
         controllers = list(self.controllers)
         wheels = self.wheels
 
-        max_players = 4 if kind in ("halo", "tmnt") else 2
+        max_players = 4 if kind in ("halo", "tmnt") else 1 if kind == "dond" else 2
         gun_players = 0
-        if kind in ("gun", "halo", "ghostbusters") and guns_enabled and guns:
+        if kind in ("gun", "halo", "ghostbusters", "dond") and guns_enabled and guns:
             if any(gun.needs_borders for gun in guns):
                 conf["Display"]["BORDER_ENABLED"] = "true"
             for nplayer, gun in enumerate(guns[:max_players], start=1):
@@ -520,7 +562,7 @@ class LinuxLoader(Emulator):
                         evdev[key] = f"{gun.node}:KEY:{code}"
                 gun_players = nplayer
 
-        if kind in ("gun", "halo", "ghostbusters", "wof"):
+        if kind in ("gun", "halo", "ghostbusters", "wof", "dond"):
             pointers = _pointers(guns if guns_enabled else [])
             if kind == "wof":
                 pointers = [pointer for pointer in pointers if pointer[1] == "REL"][:1]
@@ -543,8 +585,8 @@ class LinuxLoader(Emulator):
         # trackball is the left stick, which evdev mode does not turn into a
         # trackball), Orange County Choppers Pinball too (shoulders, triggers
         # and face buttons of its own).
-        for nplayer, pad in enumerate(controllers[:max_players] if kind not in ('bowl', 'gogostrike', 'occpinball') else [], start=1):
-            if nplayer > gun_players:
+        for nplayer, pad in enumerate(controllers[:max_players] if kind not in ('bowl', 'gogostrike', 'occpinball', 'igsown') else [], start=1):
+            if nplayer > gun_players or kind == "dond":
                 _setup_pad(
                     evdev,
                     kind,
@@ -576,6 +618,10 @@ class LinuxLoader(Emulator):
         # olympus, the cabinet's /SD4/readwrite beside ../data; SR; pt).
         elif any((game_dir / "game" / exe).is_file() for exe in ("sd3", "olympus", "SR", "pt")):
             game_dir = game_dir / "game"
+        elif any((game_dir / "game" / exe).is_file() for exe in ("PM2008v2", "RF5v2", "mb", "FHSKLv2-8p")):
+            game_dir = game_dir / "game"
+        elif (game_dir / "game" / "exe" / "pm3").is_file():
+            game_dir = game_dir / "game" / "exe"
         # Speed Rider 2: game/bin_linux beside ../data.
         elif (game_dir / "game" / "bin_linux" / "speedrider2").is_file():
             game_dir = game_dir / "game" / "bin_linux"
@@ -625,13 +671,22 @@ class LinuxLoader(Emulator):
             if links:
                 library_dirs.insert(0, str(links))
             library_dirs.extend(str(d) for d in dirs)
+        if kind == "igsown":
+            library_dirs.remove(str(game_dir / "lib"))
+            dirs = [game_dir / "lib", game_dir / "libso", game_dir, game_dir.parent / "lib", game_dir.parent / "data" / "so"]
+            library_dirs[:0] = [str(d) for d in dirs if d.is_dir()]
         if kind == "occpinball":
             # Its lib/ is the cabinet's /game/dynamic/lib, with its glibc.
             library_dirs.remove(str(game_dir / 'lib'))
         if kind == "ghostbusters":
             library_dirs.append(str(LINUXLOADER_DIR / "ghostbusters"))
         if kind == "wmmt4":
+            library_dirs.remove(str(game_dir / "lib"))
+            library_dirs.insert(0, str(game_dir / "lib"))
             library_dirs.append(str(LINUXLOADER_DIR / "wmmt4"))
+        if (game_dir / "n_gun_station_rel_opt_es1").is_file():
+            library_dirs.remove(str(game_dir / "lib"))
+            library_dirs.insert(0, str(game_dir / "lib"))
         # Extra libraries used only on Batocera 42.
         if version == 42:
             library_dirs.append(str(LINUXLOADER_DIR / "lib"))

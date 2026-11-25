@@ -28,6 +28,12 @@ env:
   # The game reads DirectInput too (keyboard, joysticks): the PC keyboard's 2 (also P2 start)
   # opens the test menu. JVS only.
   WAL_DINPUT_DISABLE: "1"
+  # The movies (DirectShow) draw through Wine's ddraw, wined3d on OpenGL by default: the
+  # dumps' ReShade 4.5.4 hooks opengl32 and its wglCreateContext / wglCreateLayerContext call
+  # each other until it throws (as Raiden III's attract). Its Vulkan backend ended the game
+  # when the movie closed. The movie's ddraw surfaces only need 2D blits: wined3d's GDI
+  # backend (no GL, no Vulkan).
+  WINE_D3D_CONFIG: "renderer=gdi"
 
 # Control names (the GUI's mapping rows).
 controls:

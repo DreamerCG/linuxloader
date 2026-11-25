@@ -36,7 +36,10 @@ _logger = logging.getLogger(__name__)
 # Controls are set per game kind, from the rom name: gun games (default),
 # driving (Cruis'n Blast), joystick (Galaga Assault, Pac-Man Chomp Mania,
 # World's Largest Pac-Man, Pink Panther Jewel Heist) and Wheel of Fortune's
-# spinner (wof). On every pad, Start starts, Select inserts a coin, R3 is the
+# spinner (wof), Doodle Jump's control bar (doodlejump: pushed by the d-pad
+# and the left stick), Deal or No Deal's crosshair (dond: a gun or a mouse,
+# and the first pad's left stick alongside).
+# On every pad, Start starts, Select inserts a coin, R3 is the
 # test switch and L3 service.
 #
 # Angry Birds Arcade is a gun game here: its cabinet fires balls with a
@@ -135,6 +138,17 @@ _logger = logging.getLogger(__name__)
 # menus (_PAD_SPEEDRIDER); no force feedback on the cabinet.
 # Their archives' flattened symlinks (small files holding their target's
 # name) are offered as links in a directory of their own (_flattened_links).
+# Percussion Master 2008, Percussion Master 3, Rock Fever 5, MuziBox and Fish
+# Hunter SKL 2 (IGS) run on linuxloader's own input (kind igsown: the
+# keyboard and up to four pads, as the loader maps them per game; evdev mode
+# has two players only). Their roms are TeknoRaven's packages (game/ and
+# data/; Fish Hunter's game/): PM2008v2 and RF5v2 in game/ with libso/
+# (libcasmcard.so), pm3 in game/exe (game/lib, exe/libso, data/so), mb in
+# game/ (game/lib and beside it, its portrait picture turned upright),
+# FHSKLv2-8p in game/ (game/lib). The drums: a pad's shoulders, triggers and
+# face buttons; MuziBox's piano: shoulders, triggers, face buttons and the
+# d-pad's up/down; Fish Hunter: four seats, the stick or d-pad turns, a or
+# R2 fires, firing puts a coin in (free play). Start, Back coin, R3 test.
 # Rockin' Bowl-O-Rama (Cosmodog) is a trackball game: the rom is the
 # cabinet's /bowl (bowlgold). It runs on linuxloader's own input: the mouse
 # or a trackball rolls the ball, and the first pad (SDL) too, its left stick
@@ -216,6 +230,15 @@ _HALO_GUN_BUTTONS: Final = {
     'middle': ('BUTTON_3', ecodes.BTN_MIDDLE),
     '1': ('BUTTON_START', ecodes.BTN_1),
     '2': ('COIN', ecodes.BTN_2),
+}
+
+# Deal or No Deal: b (bottom) presses the case under the crosshair, y (left)
+# is DEAL, a (right) NO DEAL, x (top) the panel's start (Double Deal).
+_PAD_DOND: Final = {
+    'b': 'BUTTON_1',
+    'y': 'BUTTON_2',
+    'a': 'BUTTON_3',
+    'x': 'BUTTON_4',
 }
 
 # Pad buttons common to all games (es input name -> linuxloader input,
@@ -326,6 +349,15 @@ _PAD_TMNT: Final = {
     'a': 'BUTTON_1',
     'b': 'BUTTON_2',
     'x': 'BUTTON_3',
+}
+
+# Marvel Contest of Champions: the cabinet's four attack buttons, light
+# (left face button), medium (top), heavy (right), special (bottom).
+_PAD_MCOC: Final = {
+    'y': 'BUTTON_1',
+    'x': 'BUTTON_2',
+    'a': 'BUTTON_3',
+    'b': 'BUTTON_4',
 }
 
 _PAD_GHOSTBUSTERS: Final = {
@@ -553,6 +585,9 @@ def _game_kind(rom: Path, /) -> str:
         return 'goldcaptain'
     if 'piraterevenge' in flat:
         return 'piraterevenge'
+    # IGS's drum, guitar, piano and fish games: linuxloader's own input.
+    if any(k in flat for k in ('percussionmaster', 'rockfever', 'muzibox', 'fishhunter')):
+        return 'igsown'
     if re.search(r'speeddriver[234]', re.sub(r'[^a-z0-9]', '', name)):
         return 'speeddriver234'
     if 'powertruck' in flat:
@@ -575,6 +610,8 @@ def _game_kind(rom: Path, /) -> str:
         return 'gaelco'
     if 'teenage mutant ninja turtles' in name or 'tmnt' in name:
         return 'tmnt'
+    if 'contestofchampions' in flat or 'mcoc' in flat:
+        return 'mcoc'
     if 'ghostbusters' in re.sub(r'[^a-z]', '', name):
         return 'ghostbusters'
     if 'spaceinvadersfrenzy' in flat:
@@ -583,6 +620,10 @@ def _game_kind(rom: Path, /) -> str:
         return 'joystick'
     if 'centipede' in name:
         return 'centipede'
+    # Minecraft Dungeons Arcade (g7): linuxloader reads the keyboard (MAME's
+    # layout, four players) and the pads (one station each) itself.
+    if 'minecraft' in name:
+        return 'minecraft'
     if 'cruis' in name:
         return 'driving'
     # Superbikes 3: a handlebar, a throttle and a brake, as the driving games.
@@ -607,6 +648,10 @@ def _game_kind(rom: Path, /) -> str:
         return 'deadheat'
     if 'tanktanktank' in flat:
         return 'tank'
+    if 'doodlejump' in flat:
+        return 'doodlejump'
+    if 'dealornodeal' in flat or 'dealornotdeal' in flat:
+        return 'dond'
     if 'galaga' in name or 'pac' in name or 'panther' in name:
         return 'joystick'
     if 'fortune' in name:
@@ -748,6 +793,28 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
         _set(evdev, 'ANALOGUE_1', _pad_input(pad, 'joystick1left', digital=False))
         for name, action in _PAD_PIRATEREVENGE.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
+    elif kind == 'doodlejump':
+        # The control bar: the d-pad's and the left stick's left/right push
+        # it as the arrow keys do (a step per tap, the operator menu's items,
+        # then faster while held); released, it stays where it is.
+        if nplayer != 1:
+            return
+        for direction in ('left', 'right'):
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
+    elif kind == 'dond':
+        # The crosshair: the left stick moves it at a speed (ANALOGUE_5/6),
+        # beside the gun or the mouse aiming it (ANALOGUE_1/2), whose buttons
+        # the pad's join.
+        if nplayer != 1:
+            return
+        _set(evdev, 'ANALOGUE_5', _pad_input(pad, 'joystick1left', digital=False))
+        _set(evdev, 'ANALOGUE_6', _pad_input(pad, 'joystick1up', digital=False))
+        for name, action in _PAD_DOND.items():
+            source = _pad_input(pad, name, digital=True)
+            key = player + action
+            if source is not None:
+                evdev[key] = f'{evdev[key]},{source}' if key in evdev else source
     elif kind == 'wof':
         if nplayer != 1:
             return
@@ -769,6 +836,17 @@ def _setup_pad(evdev: dict[str, str], kind: str, nplayer: int, pad: Controller, 
             _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
     elif kind == 'tmnt':
         for name, action in _PAD_TMNT.items():
+            _set(evdev, player + action, _pad_input(pad, name, digital=True))
+        for direction in _DIRECTIONS:
+            sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
+            _set(evdev, player + 'BUTTON_' + direction.upper(), ','.join(dict.fromkeys(s for s in sources if s)) or None)
+        if nplayer == 1:
+            _set(evdev, 'VOLUME_UP', _pad_input(pad, 'pageup', digital=True))
+            _set(evdev, 'VOLUME_DOWN', _pad_input(pad, 'pagedown', digital=True))
+    elif kind == 'mcoc':
+        # A stick (the d-pad and the left stick) and four attack buttons
+        # each, two players; P1's shoulders the volume.
+        for name, action in _PAD_MCOC.items():
             _set(evdev, player + action, _pad_input(pad, name, digital=True))
         for direction in _DIRECTIONS:
             sources = (_pad_input(pad, direction, digital=True), _stick_direction(pad, direction))
@@ -859,6 +937,10 @@ class LinuxloaderGenerator(Generator):
         # Big Buck Pro uses a GLUT window in place of its cabinet game mode.
         if _is_nerf(rom) or 'bigbuckhunterpro' in re.sub(r'[^a-z]', '', rom.name.lower()):
             conf['Display']['FULLSCREEN'] = '1'
+        # Marvel Contest of Champions: Unity's full screen window, at the
+        # screen's size (linuxloader asks it over the game's 1920x1080).
+        if kind == 'mcoc':
+            conf['Display']['FULLSCREEN'] = '1'
 
         # DEBUG: état de départ
         print("linuxloader kind :", kind, file=sys.stderr)
@@ -872,9 +954,10 @@ class LinuxloaderGenerator(Generator):
         # Guns (gun games): P1 on ANALOGUE_1/2, P2 on ANALOGUE_3/4, and so on;
         # then mice and touchpads for the players left, in their order.
         # Halo runs as its 4 player cabinet; the other games have 2 players.
-        max_players = 4 if kind in ('halo', 'tmnt') else 2
+        # Deal or No Deal has one.
+        max_players = 4 if kind in ('halo', 'tmnt') else 1 if kind == 'dond' else 2
         gun_players = 0
-        if kind in ('gun', 'halo', 'ghostbusters') and system.config.use_guns and guns:
+        if kind in ('gun', 'halo', 'ghostbusters', 'dond') and system.config.use_guns and guns:
             if any(gun.needs_borders for gun in guns):
                 inner, outer = bezelsUtil.gunBordersSize(system.guns_borders_size_name(guns))
                 conf['Display']['BORDER_ENABLED'] = 'true'
@@ -897,7 +980,7 @@ class LinuxloaderGenerator(Generator):
                         evdev[key] = f'{gun.node}:KEY:{code}'
                 gun_players = nplayer
 
-        if kind in ('gun', 'halo', 'ghostbusters', 'wof'):
+        if kind in ('gun', 'halo', 'ghostbusters', 'wof', 'dond'):
             pointers = _pointers(guns if system.config.use_guns and guns else [])
             # Wheel of Fortune: one mouse spins (its moves, ANALOGUE_1); its
             # buttons leave the pad's to PUSH, and a touchpad (a position, not
@@ -918,9 +1001,10 @@ class LinuxloaderGenerator(Generator):
         # Rockin' Bowl-O-Rama and Go Go Strike read them themselves (their
         # trackball is the left stick, which evdev mode does not turn into a
         # trackball), Orange County Choppers Pinball too (shoulders, triggers
-        # and face buttons of its own).
-        for nplayer, pad in enumerate(playersControllers[:max_players] if kind not in ('bowl', 'gogostrike', 'occpinball') else [], start=1):
-            if nplayer > gun_players:
+        # and face buttons of its own), and the IGS games of kind igsown.
+        for nplayer, pad in enumerate(playersControllers[:max_players] if kind not in ('bowl', 'gogostrike', 'occpinball', 'igsown') else [], start=1):
+            # Deal or No Deal: the first pad joins P1's gun or mouse.
+            if nplayer > gun_players or kind == 'dond':
                 wheel = system.config.use_wheels and pad.device_path in wheels
                 _setup_pad(evdev, kind, nplayer, pad, wheel=wheel)
 
@@ -958,6 +1042,12 @@ class LinuxloaderGenerator(Generator):
         # olympus, the cabinet's /SD4/readwrite beside ../data; SR; pt).
         elif any((game_dir / 'game' / exe).is_file() for exe in ('sd3', 'olympus', 'SR', 'pt')):
             game_dir = game_dir / 'game'
+        # Percussion Master 2008, Rock Fever 5, MuziBox, Fish Hunter SKL 2:
+        # TeknoRaven's game/; Percussion Master 3: game/exe.
+        elif any((game_dir / 'game' / exe).is_file() for exe in ('PM2008v2', 'RF5v2', 'mb', 'FHSKLv2-8p')):
+            game_dir = game_dir / 'game'
+        elif (game_dir / 'game' / 'exe' / 'pm3').is_file():
+            game_dir = game_dir / 'game' / 'exe'
         # Speed Rider 2: game/bin_linux beside ../data.
         elif (game_dir / 'game' / 'bin_linux' / 'speedrider2').is_file():
             game_dir = game_dir / 'game' / 'bin_linux'
@@ -993,6 +1083,13 @@ class LinuxloaderGenerator(Generator):
             if links:
                 library_dirs.insert(0, str(links))
             library_dirs.extend(str(d) for d in dirs)
+        if kind == 'igsown':
+            # Their own libraries first, as their run scripts have them:
+            # libso/ (libcasmcard.so), lib/ and the ELF's directory, PM3's
+            # ../lib, libso/ and ../data/so.
+            library_dirs.remove(str(game_dir / 'lib'))
+            dirs = [game_dir / 'lib', game_dir / 'libso', game_dir, game_dir.parent / 'lib', game_dir.parent / 'data' / 'so']
+            library_dirs[:0] = [str(d) for d in dirs if d.is_dir()]
         if kind == 'occpinball':
             # Its lib/ is the cabinet's /game/dynamic/lib, with its glibc.
             library_dirs.remove(str(game_dir / 'lib'))
@@ -1001,15 +1098,23 @@ class LinuxloaderGenerator(Generator):
             # compatibility library must only be offered to this game.
             library_dirs.append(str(LINUXLOADER_DIR / 'ghostbusters'))
         if kind == 'wmmt4':
+            # lib/ before Batocera's: /lib32/extralibs has an older
+            # libcrypto.so.0.9.8, without the CRYPTO_memcmp its libssl needs.
+            library_dirs.remove(str(game_dir / 'lib'))
+            library_dirs.insert(0, str(game_dir / 'lib'))
             # Its libcurl.so.4: a shim (linuxloader answers the servers).
             library_dirs.append(str(LINUXLOADER_DIR / 'wmmt4'))
+        if (game_dir / 'n_gun_station_rel_opt_es1').is_file():
+            # Gundam: Bonds of the Battlefield: lib/ (OpenSSL 0.9.8, libcrypt
+            # 2.7, the libcurl shim) before Batocera's: its libssl needs its
+            # own libcrypto (EVP_idea_cbc), not /lib32/extralibs' one.
+            library_dirs.remove(str(game_dir / 'lib'))
+            library_dirs.insert(0, str(game_dir / 'lib'))
 
         # Libs supplémentaires uniquement pour Batocera 42
         if version == 42:
             library_dirs.append(str(LINUXLOADER_DIR / 'lib'))           
-
         library_dirs.extend(['/lib', '/usr/lib', str(LINUXLOADER_DIR)])
-        
         print("Chargement des libs : ", library_dirs, file=sys.stderr)
         # Go Go Strike's 640x480 window scaled to the screen by gamescope
         # (unless the gamescope option already wraps the command).

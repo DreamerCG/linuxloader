@@ -11,7 +11,7 @@ REPO_URL="${ARCHIVE_URL:-https://github.com/DreamerCG/linuxloader/archive/refs/h
 WAL_PREFIX_URL="${WAL_PREFIX_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/full.tar.gz}"
 WAL_DOTNET11_URL="${WAL_DOTNET11_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix/dotnet11.tar.gz}"
 WAL_PREFIX_ARCHIVE_URL_BASE="${WAL_PREFIX_ARCHIVE_URL_BASE:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/system/dcg/emulators/windows-arcade-loader/wine-prefix}"
-WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/GE-Proton11-12-x86_64.tar.gz}"
+WAL_RUNNER_URL="${WAL_RUNNER_URL:-https://media.githubusercontent.com/media/DreamerCG/linuxloader/main/GE-Proton11-14-x86_64.tar.gz}"
 INSTALLER_REVISION="2026-11-23-range-validation-2"
 DEST="/userdata"
 # Dossier temporaire sur /userdata (le /tmp de Batocera est en RAM)
@@ -253,11 +253,11 @@ for prefix in apm3-test dotnet48 hog-wild wasteland; do
     fi
 done
 
-# Le runner GE-Proton 11-12 est stocké dans le dépôt Git LFS. L'extraction avec
+# Le runner GE-Proton 11-14 est stocké dans le dépôt Git LFS. L'extraction avec
 # tar préserve les permissions d'exécution nécessaires aux binaires Wine.
-WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-12-x86_64"
+WAL_RUNNER="$DEST/system/wine/custom/GE-Proton11-14-x86_64"
 WAL_RUNNER_CUSTOM="$(dirname "$WAL_RUNNER")"
-WAL_RUNNER_SOURCE="$SRC/GE-Proton11-12-x86_64.tar.gz"
+WAL_RUNNER_SOURCE="$SRC/GE-Proton11-14-x86_64.tar.gz"
 WAL_RUNNER_VERSION_FILE="$WAL_RUNNER/.version"
 [ -f "$WAL_RUNNER_SOURCE" ] || fail "archive GE-Proton introuvable dans l'archive du dépôt"
 WAL_RUNNER_EXPECTED_VERSION="$(awk '$1 == "oid" && $2 ~ /^sha256:/ { sub(/^sha256:/, "", $2); print $2; exit }' "$WAL_RUNNER_SOURCE")"
@@ -282,7 +282,7 @@ else
     if [ -x "$WAL_RUNNER/bin/wine" ] && [ -x "$WAL_RUNNER/lib/wine/x86_64-unix/wine" ]; then
         ok "Version GE-Proton différente ou inconnue, réinstallation requise"
     fi
-    WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-12-x86_64.tar.gz"
+    WAL_RUNNER_ARCHIVE="$WORK/GE-Proton11-14-x86_64.tar.gz"
     WAL_RUNNER_EXPECTED_SIZE="$(awk '$1 == "size" { print $2; exit }' "$WAL_RUNNER_SOURCE")"
     [ -n "$WAL_RUNNER_EXPECTED_SIZE" ] || fail "taille LFS introuvable pour l’archive GE-Proton"
     download_lfs_object "$WAL_RUNNER_URL" "$WAL_RUNNER_ARCHIVE" "le runner GE-Proton" \
