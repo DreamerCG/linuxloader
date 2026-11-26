@@ -145,7 +145,10 @@ _logger = logging.getLogger(__name__)
 # data/; Fish Hunter's game/): PM2008v2 and RF5v2 in game/ with libso/
 # (libcasmcard.so), pm3 in game/exe (game/lib, exe/libso, data/so), mb in
 # game/ (game/lib and beside it, its portrait picture turned upright),
-# FHSKLv2-8p in game/ (game/lib). The drums: a pad's shoulders, triggers and
+# FHSKLv2-8p in game/ (game/lib). The IGS E2100 games too (game/ dumps):
+# Ocean Party (OceanParty), Demon Hunter (zombie) and Scratch (SWIN) in
+# game/ (game/lib), Hero of Robots in game/exe (child_linux; ../data/so,
+# ../lib). The drums: a pad's shoulders, triggers and
 # face buttons; MuziBox's piano: shoulders, triggers, face buttons and the
 # d-pad's up/down; Fish Hunter: four seats, the stick or d-pad turns, a or
 # R2 fires, firing puts a coin in (free play). Start, Back coin, R3 test.
@@ -586,7 +589,8 @@ def _game_kind(rom: Path, /) -> str:
     if 'piraterevenge' in flat:
         return 'piraterevenge'
     # IGS's drum, guitar, piano and fish games: linuxloader's own input.
-    if any(k in flat for k in ('percussionmaster', 'rockfever', 'muzibox', 'fishhunter')):
+    if any(k in flat for k in ('percussionmaster', 'rockfever', 'muzibox', 'fishhunter',
+                               'oceanparty', 'demonhunter', 'heroofrobots')) or flat.startswith('scratch'):
         return 'igsown'
     if re.search(r'speeddriver[234]', re.sub(r'[^a-z0-9]', '', name)):
         return 'speeddriver234'
@@ -1044,9 +1048,11 @@ class LinuxloaderGenerator(Generator):
             game_dir = game_dir / 'game'
         # Percussion Master 2008, Rock Fever 5, MuziBox, Fish Hunter SKL 2:
         # TeknoRaven's game/; Percussion Master 3: game/exe.
-        elif any((game_dir / 'game' / exe).is_file() for exe in ('PM2008v2', 'RF5v2', 'mb', 'FHSKLv2-8p')):
+        # Ocean Party, Demon Hunter, Scratch: game/; Hero of Robots: game/exe.
+        elif any((game_dir / 'game' / exe).is_file() for exe in ('PM2008v2', 'RF5v2', 'mb', 'FHSKLv2-8p',
+                                                                  'OceanParty', 'zombie', 'SWIN')):
             game_dir = game_dir / 'game'
-        elif (game_dir / 'game' / 'exe' / 'pm3').is_file():
+        elif any((game_dir / 'game' / 'exe' / exe).is_file() for exe in ('pm3', 'child_linux')):
             game_dir = game_dir / 'game' / 'exe'
         # Speed Rider 2: game/bin_linux beside ../data.
         elif (game_dir / 'game' / 'bin_linux' / 'speedrider2').is_file():

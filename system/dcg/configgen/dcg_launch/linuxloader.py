@@ -232,7 +232,10 @@ def _game_kind(rom: Path, /) -> str:
         return "goldcaptain"
     if "piraterevenge" in flat:
         return "piraterevenge"
-    if any(k in flat for k in ("percussionmaster", "rockfever", "muzibox", "fishhunter")):
+    if any(k in flat for k in (
+        "percussionmaster", "rockfever", "muzibox", "fishhunter",
+        "oceanparty", "demonhunter", "heroofrobots",
+    )) or flat.startswith("scratch"):
         return "igsown"
     if re.search(r'speeddriver[234]', re.sub(r'[^a-z0-9]', '', name)):
         return 'speeddriver234'
@@ -618,9 +621,12 @@ class LinuxLoader(Emulator):
         # olympus, the cabinet's /SD4/readwrite beside ../data; SR; pt).
         elif any((game_dir / "game" / exe).is_file() for exe in ("sd3", "olympus", "SR", "pt")):
             game_dir = game_dir / "game"
-        elif any((game_dir / "game" / exe).is_file() for exe in ("PM2008v2", "RF5v2", "mb", "FHSKLv2-8p")):
+        elif any((game_dir / "game" / exe).is_file() for exe in (
+            "PM2008v2", "RF5v2", "mb", "FHSKLv2-8p",
+            "OceanParty", "zombie", "SWIN",
+        )):
             game_dir = game_dir / "game"
-        elif (game_dir / "game" / "exe" / "pm3").is_file():
+        elif any((game_dir / "game" / "exe" / exe).is_file() for exe in ("pm3", "child_linux")):
             game_dir = game_dir / "game" / "exe"
         # Speed Rider 2: game/bin_linux beside ../data.
         elif (game_dir / "game" / "bin_linux" / "speedrider2").is_file():
